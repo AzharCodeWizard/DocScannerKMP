@@ -93,10 +93,10 @@ fun CropScreen(
                 // Real Rendered Document Underneath
                 com.lufick.docscanner.platform.LocalImage(path = uiState.imagePath, modifier = Modifier.fillMaxSize().padding(24.dp))
 
-                // Interactive 4-point Quad with Loupe Magnifier
+                // Interactive 4-point Quad with Loupe Magnifier (Ultra-smooth 60/120 FPS)
                 QuadCropCanvas(
                     corners = uiState.corners,
-                    onCornerMoved = { idx, pos -> viewModel.updateCorner(idx, pos) },
+                    onCornersChanged = { updatedCorners -> viewModel.updateCorners(updatedCorners) },
                     onDragEnd = { viewModel.finishCornerDrag() }
                 )
             }

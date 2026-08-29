@@ -62,6 +62,10 @@ class CropViewModel(private val imageProcessor: PlatformImageProcessor? = null) 
         }
     }
 
+    fun updateCorners(corners: QuadCorners) {
+        _uiState.value = _uiState.value.copy(corners = corners)
+    }
+
     fun updateCorner(cornerIndex: Int, newPos: PointF) {
         val current = _uiState.value.corners
         val updated = when (cornerIndex) {
