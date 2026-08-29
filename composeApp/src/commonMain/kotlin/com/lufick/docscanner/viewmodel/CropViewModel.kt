@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import com.lufick.docscanner.engine.DocumentTemplateType
 import com.lufick.docscanner.model.PointF
 import com.lufick.docscanner.model.QuadCorners
+import com.lufick.docscanner.platform.PlatformImageProcessor
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,23 +33,33 @@ data class CropUiState(
     val selectedAspectRatio: CropAspectRatio = CropAspectRatio.FREE
 )
 
-class CropViewModel : ViewModel() {
+class CropViewModel(private val imageProcessor: PlatformImageProcessor? = null) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CropUiState())
     val uiState: StateFlow<CropUiState> = _uiState.asStateFlow()
 
-    fun setImage(path: String, template: DocumentTemplateType = DocumentTemplateType.RECEIPT) {
+    fun setImage(
+        path: String,
+        template: DocumentTemplateType = DocumentTemplateType.RECEIPT,
+        initialCorners: QuadCorners? = null
+    ) {
+        val defaultQuad = initialCorners ?: QuadCorners(
+            topLeft = PointF(0.06f, 0.08f),
+            topRight = PointF(0.94f, 0.08f),
+            bottomRight = PointF(0.94f, 0.92f),
+            bottomLeft = PointF(0.06f, 0.92f)
+        )
         _uiState.value = _uiState.value.copy(
             imagePath = path,
             templateType = template,
             rotationDegrees = 0,
-            corners = QuadCorners(
-                topLeft = PointF(0.06f, 0.08f),
-                topRight = PointF(0.94f, 0.08f),
-                bottomRight = PointF(0.94f, 0.92f),
-                bottomLeft = PointF(0.06f, 0.92f)
-            )
+            corners = defaultQuad
         )
+
+        // If no initial corners provided from camera, run auto-detection on the captured image
+        if (initialCorners == null && imageProcessor != null && path.isNotEmpty()) {
+            autoDetect()
+        }
     }
 
     fun updateCorner(cornerIndex: Int, newPos: PointF) {
@@ -74,14 +87,33 @@ class CropViewModel : ViewModel() {
     }
 
     fun autoDetect() {
-        _uiState.value = _uiState.value.copy(
-            corners = QuadCorners(
-                topLeft = PointF(0.08f, 0.10f),
-                topRight = PointF(0.92f, 0.10f),
-                bottomRight = PointF(0.90f, 0.90f),
-                bottomLeft = PointF(0.10f, 0.90f)
+        val currentPath = _uiState.value.imagePath
+        if (imageProcessor != null && currentPath.isNotEmpty()) {
+            viewModelScope.launch {
+                try {
+                    val detected = imageProcessor.detectDocumentCorners(currentPath)
+                    _uiState.value = _uiState.value.copy(corners = detected)
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        corners = QuadCorners(
+                            topLeft = PointF(0.08f, 0.08f),
+                            topRight = PointF(0.92f, 0.08f),
+                            bottomRight = PointF(0.92f, 0.92f),
+                            bottomLeft = PointF(0.08f, 0.92f)
+                        )
+                    )
+                }
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(
+                corners = QuadCorners(
+                    topLeft = PointF(0.08f, 0.08f),
+                    topRight = PointF(0.92f, 0.08f),
+                    bottomRight = PointF(0.92f, 0.92f),
+                    bottomLeft = PointF(0.08f, 0.92f)
+                )
             )
-        )
+        }
     }
 
     fun fullPage() {

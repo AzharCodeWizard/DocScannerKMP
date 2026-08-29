@@ -139,13 +139,14 @@ class CameraViewModel : ViewModel() {
 
         if (_uiState.value.isAutoCaptureOn && _uiState.value.scanMode == ScanMode.DOCUMENT) {
             if (isStable) {
-                val nextProgress = (_uiState.value.autoCaptureProgress + 0.06f).coerceAtMost(1.0f)
-                _uiState.value = _uiState.value.copy(autoCaptureProgress = nextProgress)
+                if (autoCaptureJob == null || !autoCaptureJob!!.isActive) {
+                    startAutoCaptureTimer()
+                }
             } else {
-                _uiState.value = _uiState.value.copy(autoCaptureProgress = 0.0f)
+                cancelAutoCapture()
             }
         } else {
-            _uiState.value = _uiState.value.copy(autoCaptureProgress = 0.0f)
+            cancelAutoCapture()
         }
     }
 
@@ -170,8 +171,25 @@ class CameraViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isIdCardFront = !_uiState.value.isIdCardFront)
     }
 
+    private fun startAutoCaptureTimer() {
+        autoCaptureJob?.cancel()
+        autoCaptureJob = viewModelScope.launch {
+            val steps = 20
+            for (i in 1..steps) {
+                delay(45L) // ~900ms smooth countdown
+                _uiState.value = _uiState.value.copy(
+                    autoCaptureProgress = i.toFloat() / steps.toFloat(),
+                    detectionState = DetectionState.HOLD_STILL
+                )
+            }
+        }
+    }
+
     private fun cancelAutoCapture() {
         autoCaptureJob?.cancel()
-        _uiState.value = _uiState.value.copy(autoCaptureProgress = 0f)
+        autoCaptureJob = null
+        if (_uiState.value.autoCaptureProgress != 0f) {
+            _uiState.value = _uiState.value.copy(autoCaptureProgress = 0f)
+        }
     }
 }

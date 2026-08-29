@@ -38,14 +38,14 @@ fun DocScannerApp() {
     val repository = remember { InMemoryDocumentRepository() }
     val scope = rememberCoroutineScope()
 
+    val imageProcessor = rememberPlatformImageProcessor()
     val homeViewModel = remember { HomeViewModel(repository) }
     val cameraViewModel = remember { CameraViewModel() }
-    val cropViewModel = remember { CropViewModel() }
+    val cropViewModel = remember { CropViewModel(imageProcessor) }
     val filterViewModel = remember { FilterViewModel() }
     val detailViewModel = remember { DocumentDetailViewModel(repository) }
     val ocrViewModel = remember { OcrViewModel() }
     val pdfToolsViewModel = remember { PdfToolsViewModel() }
-    val imageProcessor = rememberPlatformImageProcessor()
     val idCardViewModel = remember { IdCardViewModel(imageProcessor) }
 
     DocScannerTheme {
@@ -77,7 +77,8 @@ fun DocScannerApp() {
                             ScanMode.PASSPORT -> DocumentTemplateType.PASSPORT
                             ScanMode.QR_CODE -> DocumentTemplateType.RECEIPT
                         }
-                        cropViewModel.setImage(lastCaptured, template)
+                        val detectedCorners = cameraViewModel.uiState.value.detectedQuad
+                        cropViewModel.setImage(lastCaptured, template, initialCorners = detectedCorners)
                         navController.navigate(Screen.Crop.route)
                     }
                 )

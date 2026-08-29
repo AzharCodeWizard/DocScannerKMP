@@ -19,6 +19,8 @@ expect class PlatformImageProcessor {
         contrast: Float
     ): String
 
+    suspend fun detectDocumentCorners(imagePath: String): QuadCorners
+
     suspend fun stitchIdCard(
         frontImagePath: String,
         backImagePath: String

@@ -25,6 +25,15 @@ actual class PlatformImageProcessor {
         return "ios_filtered_${System.currentTimeMillis()}.jpg"
     }
 
+    actual suspend fun detectDocumentCorners(imagePath: String): QuadCorners {
+        return QuadCorners(
+            topLeft = PointF(0.08f, 0.08f),
+            topRight = PointF(0.92f, 0.08f),
+            bottomRight = PointF(0.92f, 0.92f),
+            bottomLeft = PointF(0.08f, 0.92f)
+        )
+    }
+
     actual suspend fun stitchIdCard(
         frontImagePath: String,
         backImagePath: String
