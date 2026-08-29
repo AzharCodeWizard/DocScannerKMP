@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lufick.docscanner.theme.LufickEmerald
+import com.lufick.docscanner.platform.rememberPlatformShare
 import com.lufick.docscanner.ui.components.LufickTopBar
 import com.lufick.docscanner.viewmodel.OcrViewModel
 
@@ -48,6 +48,8 @@ fun OcrScreen(
     viewModel: OcrViewModel,
     onBack: () -> Unit
 ) {
+    val platformShare = rememberPlatformShare()
+
     LaunchedEffect(docId) {
         val sampleReceiptText = """WHOLE FOODS MARKET
 Date: Oct 25, 2026   Inv #84920
@@ -68,13 +70,13 @@ Thank you for shopping at Whole Foods!"""
     Scaffold(
         topBar = {
             LufickTopBar(
-                title = "AI OCR & Text",
+                title = "AI OCR & Smart Entities",
                 onBackClick = onBack,
                 actions = {
                     Button(
                         onClick = { viewModel.onTextCopied() },
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = LufickEmerald),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color.Black)
@@ -96,7 +98,7 @@ Thank you for shopping at Whole Foods!"""
             TabRow(
                 selectedTabIndex = uiState.selectedTab,
                 containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = LufickEmerald
+                contentColor = MaterialTheme.colorScheme.primary
             ) {
                 Tab(
                     selected = uiState.selectedTab == 0,
@@ -135,10 +137,10 @@ Thank you for shopping at Whole Foods!"""
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(LufickEmerald.copy(alpha = 0.15f))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text(entity.category, color = LufickEmerald, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(entity.category, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -153,7 +155,8 @@ Thank you for shopping at Whole Foods!"""
                         .weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(16.dp)
                 )
@@ -165,21 +168,29 @@ Thank you for shopping at Whole Foods!"""
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
-                    onClick = { /* Export TXT */ },
+                    onClick = {
+                        ocr?.fullText?.let { text ->
+                            platformShare.shareText("Extracted OCR Text:\n\n$text")
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Text("Export .TXT", color = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.padding(start = 4.dp))
+                    Text("Share Text", color = MaterialTheme.colorScheme.onSurface)
                 }
 
                 Button(
-                    onClick = { /* Export Word */ },
+                    onClick = {
+                        viewModel.onTextCopied()
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Export Word", color = MaterialTheme.colorScheme.onSurface)
+                    Text(if (uiState.isCopied) "Copied!" else "Copy All", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }

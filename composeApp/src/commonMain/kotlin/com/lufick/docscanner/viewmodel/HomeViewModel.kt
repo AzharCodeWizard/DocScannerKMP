@@ -13,13 +13,22 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class DocSortOrder(val title: String) {
+    DATE_DESC("Newest First"),
+    DATE_ASC("Oldest First"),
+    NAME_ASC("Name (A-Z)"),
+    PAGE_COUNT("Most Pages")
+}
+
 data class HomeUiState(
     val searchQuery: String = "",
     val selectedFolderId: String = "f_all",
     val selectedTagId: String? = null,
     val isGridView: Boolean = true,
+    val sortOrder: DocSortOrder = DocSortOrder.DATE_DESC,
     val isSelectionMode: Boolean = false,
-    val selectedDocIds: Set<String> = emptySet()
+    val selectedDocIds: Set<String> = emptySet(),
+    val showCreateFolderDialog: Boolean = false
 )
 
 class HomeViewModel(
@@ -39,13 +48,22 @@ class HomeViewModel(
         repository.getAllDocuments(),
         _uiState
     ) { docs, state ->
-        docs.filter { doc ->
-            val matchesFolder = state.selectedFolderId == "f_all" || doc.folderId == state.selectedFolderId
+        val filtered = docs.filter { doc ->
+            val matchesFolder = state.selectedFolderId == "f_all" || 
+                                (state.selectedFolderId == "f_fav" && doc.isFavorite) ||
+                                doc.folderId == state.selectedFolderId
             val matchesQuery = state.searchQuery.isEmpty() ||
                     doc.title.contains(state.searchQuery, ignoreCase = true) ||
                     doc.pages.any { it.ocrText?.contains(state.searchQuery, ignoreCase = true) == true }
             val matchesTag = state.selectedTagId == null || doc.tags.contains(state.selectedTagId)
             matchesFolder && matchesQuery && matchesTag
+        }
+
+        when (state.sortOrder) {
+            DocSortOrder.DATE_DESC -> filtered.sortedByDescending { it.updatedAt }
+            DocSortOrder.DATE_ASC -> filtered.sortedBy { it.updatedAt }
+            DocSortOrder.NAME_ASC -> filtered.sortedBy { it.title.lowercase() }
+            DocSortOrder.PAGE_COUNT -> filtered.sortedByDescending { it.pageCount }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -61,8 +79,24 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(selectedTagId = tagId)
     }
 
+    fun setSortOrder(order: DocSortOrder) {
+        _uiState.value = _uiState.value.copy(sortOrder = order)
+    }
+
     fun toggleViewMode() {
         _uiState.value = _uiState.value.copy(isGridView = !_uiState.value.isGridView)
+    }
+
+    fun setShowCreateFolderDialog(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showCreateFolderDialog = show)
+    }
+
+    fun createFolder(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            repository.createFolder(name)
+            setShowCreateFolderDialog(false)
+        }
     }
 
     fun toggleFavorite(docId: String) {

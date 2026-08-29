@@ -1,5 +1,6 @@
 package com.lufick.docscanner.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,15 +21,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,8 +51,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lufick.docscanner.theme.LufickEmerald
+import com.lufick.docscanner.platform.LocalImage
+import com.lufick.docscanner.platform.rememberPlatformShare
 import com.lufick.docscanner.ui.components.LufickTopBar
+import com.lufick.docscanner.ui.components.SignatureDrawingPad
 import com.lufick.docscanner.viewmodel.DocumentDetailViewModel
 
 @Composable
@@ -62,6 +72,44 @@ fun DocumentDetailScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val doc = uiState.document
+    val platformShare = rememberPlatformShare()
+
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameInput by remember { mutableStateOf("") }
+    var showSignaturePad by remember { mutableStateOf(false) }
+    var isSignatureAdded by remember { mutableStateOf(false) }
+
+    if (showRenameDialog && doc != null) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Document", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = renameInput,
+                    onValueChange = { renameInput = it },
+                    label = { Text("Document Title") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (renameInput.isNotBlank()) {
+                        viewModel.renameDocument(renameInput)
+                    }
+                    showRenameDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -69,11 +117,17 @@ fun DocumentDetailScreen(
                 title = doc?.title ?: "Document",
                 onBackClick = onBack,
                 actions = {
+                    IconButton(onClick = {
+                        renameInput = doc?.title ?: ""
+                        showRenameDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = { onNavigateToPdfTools(docId) }) {
-                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Tools", tint = LufickEmerald)
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Tools", tint = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = { onNavigateToOcr(docId) }) {
-                        Icon(Icons.Default.TextFields, contentDescription = "OCR Text", tint = LufickEmerald)
+                        Icon(Icons.Default.TextFields, contentDescription = "OCR Text", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
@@ -100,39 +154,74 @@ fun DocumentDetailScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .background(Color.White)
-                        .padding(20.dp),
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "${doc.title} - Page ${uiState.selectedPageIndex + 1}",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black,
-                            fontSize = 15.sp
+                    if (activePage != null && activePage.processedImagePath.isNotEmpty() && !activePage.processedImagePath.startsWith("placeholder")) {
+                        LocalImage(
+                            path = activePage.processedImagePath,
+                            modifier = Modifier.fillMaxSize()
                         )
-                        if (!activePage?.ocrText.isNullOrEmpty()) {
+                    } else {
+                        // High quality document placeholder
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(24.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = activePage?.ocrText ?: "",
-                                color = Color.DarkGray,
-                                fontSize = 11.sp,
-                                lineHeight = 16.sp
+                                text = "${doc.title} • Page ${uiState.selectedPageIndex + 1}",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                fontSize = 16.sp
                             )
-                        } else {
-                            Text("High resolution scanned page", color = Color.Gray, fontSize = 12.sp)
+                            if (!activePage?.ocrText.isNullOrEmpty()) {
+                                Text(
+                                    text = activePage?.ocrText ?: "",
+                                    color = Color.DarkGray,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                )
+                            } else {
+                                Text("High-resolution digitized scan ready for export.", color = Color.Gray, fontSize = 13.sp)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Filter: ${activePage?.filterType?.displayName ?: "Magic Color"}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (isSignatureAdded) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("✓ Digitally Signed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
                         }
-                        Text(
-                            text = "Filter: ${activePage?.filterType?.displayName ?: "Magic Color"}",
-                            fontSize = 10.sp,
-                            color = LufickEmerald,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Signature Pad Overlay if active
+                if (showSignaturePad) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    SignatureDrawingPad(
+                        onSaveSignature = {
+                            isSignatureAdded = true
+                            showSignaturePad = false
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Multi-Page Thumbnails Strip
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -155,7 +244,7 @@ fun DocumentDetailScreen(
                                     .background(Color.White)
                                     .border(
                                         2.dp,
-                                        if (isSelected) LufickEmerald else Color.Transparent,
+                                        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                         RoundedCornerShape(12.dp)
                                     )
                                     .clickable { viewModel.selectPage(idx) }
@@ -180,17 +269,17 @@ fun DocumentDetailScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.Add, contentDescription = null, tint = LufickEmerald)
-                                    Text("Add", fontSize = 10.sp, color = LufickEmerald)
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text("Add", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Bottom Action Bar (PDF, OCR, Share, Delete Page)
+                // Bottom Action Bar (Sign, PDF Tools, Share, Delete Page)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -199,24 +288,35 @@ fun DocumentDetailScreen(
                         .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
+                    TextButton(onClick = { showSignaturePad = !showSignaturePad }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Draw, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(if (showSignaturePad) "Close" else "E-Sign", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
                     TextButton(onClick = { onNavigateToPdfTools(docId) }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = LufickEmerald)
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Text("PDF Tools", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
 
-                    TextButton(onClick = { onNavigateToOcr(docId) }) {
+                    TextButton(onClick = {
+                        activePage?.processedImagePath?.let { path ->
+                            platformShare.shareFile(path, "image/jpeg")
+                        }
+                    }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.TextFields, contentDescription = null, tint = LufickEmerald)
-                            Text("OCR Text", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Share Page", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
 
                     TextButton(onClick = { viewModel.deleteCurrentPage() }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444))
-                            Text("Delete Page", fontSize = 10.sp, color = Color(0xFFEF4444))
+                            Text("Delete", fontSize = 10.sp, color = Color(0xFFEF4444))
                         }
                     }
                 }

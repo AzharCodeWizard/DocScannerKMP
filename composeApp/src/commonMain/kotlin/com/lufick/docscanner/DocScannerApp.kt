@@ -3,6 +3,8 @@ package com.lufick.docscanner
 import com.lufick.docscanner.util.currentTimeMillis
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.compose.NavHost
@@ -23,15 +25,17 @@ import com.lufick.docscanner.ui.screens.HomeScreen
 import com.lufick.docscanner.ui.screens.IdCardScannerScreen
 import com.lufick.docscanner.ui.screens.OcrScreen
 import com.lufick.docscanner.ui.screens.PdfToolsScreen
+import com.lufick.docscanner.ui.screens.SettingsScreen
 import com.lufick.docscanner.viewmodel.CameraViewModel
 import com.lufick.docscanner.viewmodel.CropViewModel
 import com.lufick.docscanner.viewmodel.DocumentDetailViewModel
 import com.lufick.docscanner.viewmodel.FilterViewModel
 import com.lufick.docscanner.viewmodel.HomeViewModel
 import com.lufick.docscanner.viewmodel.IdCardViewModel
-import com.lufick.docscanner.platform.rememberPlatformImageProcessor
 import com.lufick.docscanner.viewmodel.OcrViewModel
 import com.lufick.docscanner.viewmodel.PdfToolsViewModel
+import com.lufick.docscanner.viewmodel.SettingsViewModel
+import com.lufick.docscanner.platform.rememberPlatformImageProcessor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -39,6 +43,9 @@ fun DocScannerApp() {
     val navController = rememberNavController()
     val repository = remember { InMemoryDocumentRepository() }
     val scope = rememberCoroutineScope()
+
+    val settingsViewModel = remember { SettingsViewModel() }
+    val settingsState by settingsViewModel.uiState.collectAsState()
 
     val imageProcessor = rememberPlatformImageProcessor()
     val homeViewModel = remember { HomeViewModel(repository) }
@@ -50,7 +57,10 @@ fun DocScannerApp() {
     val pdfToolsViewModel = remember { PdfToolsViewModel() }
     val idCardViewModel = remember { IdCardViewModel(imageProcessor) }
 
-    DocScannerTheme {
+    DocScannerTheme(
+        themeMode = settingsState.themeMode,
+        accentTheme = settingsState.accentTheme
+    ) {
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route
@@ -60,6 +70,7 @@ fun DocScannerApp() {
                     viewModel = homeViewModel,
                     onNavigateToCamera = { navController.navigate(Screen.Camera.route) },
                     onNavigateToIdCard = { navController.navigate(Screen.IdCard.route) },
+                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                     onNavigateToDetail = { docId ->
                         navController.navigate(Screen.DocumentDetail.createRoute(docId))
                     }
@@ -183,6 +194,13 @@ fun DocScannerApp() {
                     viewModel = idCardViewModel,
                     onBack = { navController.popBackStack() },
                     onDone = { navController.popBackStack(Screen.Home.route, inclusive = false) }
+                )
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

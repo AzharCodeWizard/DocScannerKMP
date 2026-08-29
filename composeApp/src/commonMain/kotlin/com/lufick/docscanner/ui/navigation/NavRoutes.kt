@@ -15,4 +15,5 @@ sealed class Screen(val route: String) {
         fun createRoute(docId: String) = "pdf_tools/$docId"
     }
     data object IdCard : Screen("id_card")
+    data object Settings : Screen("settings")
 }
