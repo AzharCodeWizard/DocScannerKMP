@@ -1,5 +1,7 @@
 package com.lufick.docscanner.platform
 
+import com.lufick.docscanner.util.currentTimeMillis
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +24,7 @@ actual fun CameraPreview(
     // Bind mock handler
     onCameraBind(object : PlatformCameraHandler {
         override fun capturePhoto(onPhotoCaptured: (imagePath: String) -> Unit) {
-            onPhotoCaptured("ios_captured_scan_${System.currentTimeMillis()}.jpg")
+            onPhotoCaptured("ios_captured_scan_${currentTimeMillis()}.jpg")
         }
         override fun toggleFlash(enabled: Boolean) {}
     })

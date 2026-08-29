@@ -1,5 +1,7 @@
 package com.lufick.docscanner
 
+import com.lufick.docscanner.util.currentTimeMillis
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -107,9 +109,9 @@ fun DocScannerApp() {
                     onBack = { navController.popBackStack() },
                     onDone = {
                         val filterState = filterViewModel.uiState.value
-                        val newDocId = "doc_" + System.currentTimeMillis()
+                        val newDocId = "doc_" + currentTimeMillis()
                         val newPage = ScannedPage(
-                            id = "p_" + System.currentTimeMillis(),
+                            id = "p_" + currentTimeMillis(),
                             pageNumber = 1,
                             originalImagePath = filterState.imagePath,
                             processedImagePath = filterState.imagePath,
@@ -119,7 +121,7 @@ fun DocScannerApp() {
                             brightness = filterState.brightness,
                             contrast = filterState.contrast,
                             ocrText = "WHOLE FOODS MARKET\nDate: Oct 25, 2026\nTotal: $37.04",
-                            createdAt = System.currentTimeMillis()
+                            createdAt = currentTimeMillis()
                         )
                         val title = when (filterState.templateType) {
                             DocumentTemplateType.RECEIPT -> "Whole Foods Receipt"
@@ -134,8 +136,8 @@ fun DocScannerApp() {
                             folderId = "f_receipts",
                             tags = listOf("New Scan", "OCR Ready"),
                             pages = listOf(newPage),
-                            createdAt = System.currentTimeMillis(),
-                            updatedAt = System.currentTimeMillis(),
+                            createdAt = currentTimeMillis(),
+                            updatedAt = currentTimeMillis(),
                             isFavorite = true
                         )
                         scope.launch {

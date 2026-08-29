@@ -1,5 +1,7 @@
 package com.lufick.docscanner.repository
 
+import com.lufick.docscanner.util.currentTimeMillis
+
 import com.lufick.docscanner.model.Document
 import com.lufick.docscanner.model.FilterType
 import com.lufick.docscanner.model.Folder
@@ -171,7 +173,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
 
     override suspend fun updateDocumentTitle(id: String, newTitle: String) {
         val current = _documents.value.map { doc ->
-            if (doc.id == id) doc.copy(title = newTitle, updatedAt = System.currentTimeMillis()) else doc
+            if (doc.id == id) doc.copy(title = newTitle, updatedAt = currentTimeMillis()) else doc
         }
         _documents.value = current
     }
@@ -180,7 +182,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
         val current = _documents.value.map { doc ->
             if (doc.id == documentId) {
                 val updatedPages = doc.pages + page.copy(pageNumber = doc.pages.size + 1)
-                doc.copy(pages = updatedPages, updatedAt = System.currentTimeMillis())
+                doc.copy(pages = updatedPages, updatedAt = currentTimeMillis())
             } else doc
         }
         _documents.value = current
@@ -190,7 +192,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
         val current = _documents.value.map { doc ->
             if (doc.id == documentId) {
                 val updatedPages = doc.pages.map { if (it.id == page.id) page else it }
-                doc.copy(pages = updatedPages, updatedAt = System.currentTimeMillis())
+                doc.copy(pages = updatedPages, updatedAt = currentTimeMillis())
             } else doc
         }
         _documents.value = current
@@ -199,7 +201,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
     override suspend fun reorderPages(documentId: String, newPages: List<ScannedPage>) {
         val indexed = newPages.mapIndexed { idx, p -> p.copy(pageNumber = idx + 1) }
         val current = _documents.value.map { doc ->
-            if (doc.id == documentId) doc.copy(pages = indexed, updatedAt = System.currentTimeMillis()) else doc
+            if (doc.id == documentId) doc.copy(pages = indexed, updatedAt = currentTimeMillis()) else doc
         }
         _documents.value = current
     }
@@ -209,7 +211,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
             if (doc.id == documentId) {
                 val filtered = doc.pages.filterNot { it.id == pageId }
                     .mapIndexed { idx, p -> p.copy(pageNumber = idx + 1) }
-                doc.copy(pages = filtered, updatedAt = System.currentTimeMillis())
+                doc.copy(pages = filtered, updatedAt = currentTimeMillis())
             } else doc
         }
         _documents.value = current
@@ -217,11 +219,11 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
 
     override suspend fun createFolder(name: String, colorHex: String) {
         val newFolder = Folder(
-            id = "f_" + System.currentTimeMillis(),
+            id = "f_" + currentTimeMillis(),
             name = name,
             colorHex = colorHex,
             documentCount = 0,
-            createdAt = System.currentTimeMillis()
+            createdAt = currentTimeMillis()
         )
         _folders.value = _folders.value + newFolder
     }
@@ -232,7 +234,7 @@ A948201940USA9407142F3401015<<<<<<<<<<<<<<04""",
 
     override suspend fun createTag(name: String, colorHex: String) {
         val newTag = Tag(
-            id = "t_" + System.currentTimeMillis(),
+            id = "t_" + currentTimeMillis(),
             name = name,
             colorHex = colorHex
         )

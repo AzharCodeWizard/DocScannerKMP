@@ -1,10 +1,11 @@
 package com.lufick.docscanner.platform
 
+import com.lufick.docscanner.util.currentTimeMillis
+import com.lufick.docscanner.model.PointF
+import com.lufick.docscanner.model.QuadCorners
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-
 import com.lufick.docscanner.model.FilterType
-import com.lufick.docscanner.model.QuadCorners
 
 actual class PlatformImageProcessor {
 
@@ -13,7 +14,7 @@ actual class PlatformImageProcessor {
         corners: QuadCorners,
         rotationDegrees: Int
     ): String {
-        return "ios_warped_${System.currentTimeMillis()}.jpg"
+        return "ios_warped_${currentTimeMillis()}.jpg"
     }
 
     actual suspend fun applyFilter(
@@ -22,7 +23,7 @@ actual class PlatformImageProcessor {
         brightness: Float,
         contrast: Float
     ): String {
-        return "ios_filtered_${System.currentTimeMillis()}.jpg"
+        return "ios_filtered_${currentTimeMillis()}.jpg"
     }
 
     actual suspend fun detectDocumentCorners(imagePath: String): QuadCorners {
@@ -38,7 +39,7 @@ actual class PlatformImageProcessor {
         frontImagePath: String,
         backImagePath: String
     ): String {
-        return "ios_id_card_${System.currentTimeMillis()}.jpg"
+        return "ios_id_card_${currentTimeMillis()}.jpg"
     }
 }
 
