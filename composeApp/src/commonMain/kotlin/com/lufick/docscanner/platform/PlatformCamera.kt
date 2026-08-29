@@ -8,10 +8,11 @@ import com.lufick.docscanner.model.QuadCorners
 expect fun CameraPreview(
     modifier: Modifier = Modifier,
     flashEnabled: Boolean = false,
-    onEdgeDetected: (QuadCorners) -> Unit = {}
+    onEdgeDetected: (QuadCorners) -> Unit = {},
+    onCameraBind: (PlatformCameraHandler) -> Unit = {}
 )
 
-expect class PlatformCameraHandler {
+interface PlatformCameraHandler {
     fun capturePhoto(onPhotoCaptured: (imagePath: String) -> Unit)
     fun toggleFlash(enabled: Boolean)
 }

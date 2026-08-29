@@ -13,18 +13,17 @@ import com.lufick.docscanner.model.QuadCorners
 actual fun CameraPreview(
     modifier: Modifier,
     flashEnabled: Boolean,
-    onEdgeDetected: (QuadCorners) -> Unit
+    onEdgeDetected: (QuadCorners) -> Unit,
+    onCameraBind: (PlatformCameraHandler) -> Unit
 ) {
-    // iOS AVFoundation camera view or simulated canvas preview
+    // Mock iOS camera for now
     Box(modifier = modifier.fillMaxSize().background(Color.Black))
-}
-
-actual class PlatformCameraHandler {
-    actual fun capturePhoto(onPhotoCaptured: (imagePath: String) -> Unit) {
-        onPhotoCaptured("ios_captured_scan_${System.currentTimeMillis()}.jpg")
-    }
-
-    actual fun toggleFlash(enabled: Boolean) {
-        // AVFoundation AVCaptureDevice torch mode
-    }
+    
+    // Bind mock handler
+    onCameraBind(object : PlatformCameraHandler {
+        override fun capturePhoto(onPhotoCaptured: (imagePath: String) -> Unit) {
+            onPhotoCaptured("ios_captured_scan_${System.currentTimeMillis()}.jpg")
+        }
+        override fun toggleFlash(enabled: Boolean) {}
+    })
 }

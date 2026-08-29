@@ -1,5 +1,8 @@
 package com.lufick.docscanner.platform
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+
 import com.lufick.docscanner.model.FilterType
 import com.lufick.docscanner.model.QuadCorners
 
@@ -28,4 +31,9 @@ actual class PlatformImageProcessor {
     ): String {
         return "ios_id_card_${System.currentTimeMillis()}.jpg"
     }
+}
+
+@Composable
+actual fun rememberPlatformImageProcessor(): PlatformImageProcessor {
+    return remember { PlatformImageProcessor() }
 }

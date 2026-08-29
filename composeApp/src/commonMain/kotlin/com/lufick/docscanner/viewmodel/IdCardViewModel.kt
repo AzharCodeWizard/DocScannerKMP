@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.lufick.docscanner.platform.PlatformImageProcessor
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 
 enum class IdCardSide { FRONT, BACK, PREVIEW }
 
@@ -14,7 +17,7 @@ data class IdCardUiState(
     val stitchedImagePath: String? = null
 )
 
-class IdCardViewModel : ViewModel() {
+class IdCardViewModel(private val imageProcessor: PlatformImageProcessor) : ViewModel() {
 
     private val _uiState = MutableStateFlow(IdCardUiState())
     val uiState: StateFlow<IdCardUiState> = _uiState.asStateFlow()
@@ -31,6 +34,15 @@ class IdCardViewModel : ViewModel() {
             backImagePath = path,
             currentSide = IdCardSide.PREVIEW
         )
+        // Trigger stitch
+        viewModelScope.launch {
+            val front = _uiState.value.frontImagePath
+            val back = path
+            if (front != null) {
+                val stitched = imageProcessor.stitchIdCard(front, back)
+                _uiState.value = _uiState.value.copy(stitchedImagePath = stitched)
+            }
+        }
     }
 
     fun retake() {

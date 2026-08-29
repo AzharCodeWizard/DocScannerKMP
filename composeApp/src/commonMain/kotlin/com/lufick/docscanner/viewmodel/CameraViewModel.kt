@@ -31,17 +31,17 @@ data class CameraUiState(
     val scanMode: ScanMode = ScanMode.DOCUMENT,
     val isBatchMode: Boolean = false,
     val flashMode: FlashMode = FlashMode.OFF,
-    val isAutoCaptureOn: Boolean = true,
+    val isAutoCaptureOn: Boolean = false,
     val isGridVisible: Boolean = false,
     val isSpiritLevelVisible: Boolean = false,
     val zoomRatio: Float = 1.0f,
     val detectionState: DetectionState = DetectionState.DETECTED,
     val autoCaptureProgress: Float = 0.0f,
     val detectedQuad: QuadCorners = QuadCorners(
-        topLeft = PointF(0.10f, 0.14f),
-        topRight = PointF(0.90f, 0.14f),
-        bottomRight = PointF(0.88f, 0.86f),
-        bottomLeft = PointF(0.12f, 0.86f)
+        topLeft = PointF(0.08f, 0.12f),
+        topRight = PointF(0.92f, 0.12f),
+        bottomRight = PointF(0.92f, 0.62f),
+        bottomLeft = PointF(0.08f, 0.62f)
     ),
     val isIdCardFront: Boolean = true,
     val tapFocusPoint: Offset? = null,
@@ -107,7 +107,7 @@ class CameraViewModel : ViewModel() {
     fun onEdgeDetected(quad: QuadCorners) {
         // Smooth lerp update
         val curr = _uiState.value.detectedQuad
-        val lerpFactor = 0.4f
+        val lerpFactor = 0.35f
         val smoothed = QuadCorners(
             topLeft = PointF(
                 curr.topLeft.x + (quad.topLeft.x - curr.topLeft.x) * lerpFactor,
@@ -126,10 +126,27 @@ class CameraViewModel : ViewModel() {
                 curr.bottomLeft.y + (quad.bottomLeft.y - curr.bottomLeft.y) * lerpFactor
             )
         )
+
+        val isStable = kotlin.math.abs(curr.topLeft.x - quad.topLeft.x) < 0.05f &&
+                       kotlin.math.abs(curr.topLeft.y - quad.topLeft.y) < 0.05f
+
+        val newDetectionState = if (isStable) DetectionState.HOLD_STILL else DetectionState.DETECTED
+
         _uiState.value = _uiState.value.copy(
             detectedQuad = smoothed,
-            detectionState = DetectionState.DETECTED
+            detectionState = newDetectionState
         )
+
+        if (_uiState.value.isAutoCaptureOn && _uiState.value.scanMode == ScanMode.DOCUMENT) {
+            if (isStable) {
+                val nextProgress = (_uiState.value.autoCaptureProgress + 0.06f).coerceAtMost(1.0f)
+                _uiState.value = _uiState.value.copy(autoCaptureProgress = nextProgress)
+            } else {
+                _uiState.value = _uiState.value.copy(autoCaptureProgress = 0.0f)
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(autoCaptureProgress = 0.0f)
+        }
     }
 
     fun onPhotoCaptured(path: String) {

@@ -34,6 +34,12 @@ import com.lufick.docscanner.theme.LufickEmerald
 import com.lufick.docscanner.ui.components.LufickTopBar
 import com.lufick.docscanner.viewmodel.IdCardSide
 import com.lufick.docscanner.viewmodel.IdCardViewModel
+import com.lufick.docscanner.platform.CameraPreview
+import com.lufick.docscanner.platform.PlatformCameraHandler
+import com.lufick.docscanner.platform.LocalImage
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
 fun IdCardScannerScreen(
@@ -82,22 +88,34 @@ fun IdCardScannerScreen(
             }
 
             if (uiState.currentSide != IdCardSide.PREVIEW) {
-                // ID Card Viewfinder Frame
-                Box(
-                    modifier = Modifier
-                        .size(320.dp, 200.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.DarkGray.copy(alpha = 0.4f))
-                        .border(2.dp, LufickEmerald, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (uiState.currentSide == IdCardSide.FRONT) "FRONT OF CARD" else "BACK OF CARD",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                var cameraHandler by remember { mutableStateOf<PlatformCameraHandler?>(null) }
+                
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
+                    CameraPreview(
+                        modifier = Modifier.fillMaxSize(),
+                        onCameraBind = { handler -> cameraHandler = handler }
                     )
+                    
+                    // ID Card Guide Overlay
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(320.dp, 200.dp)
+                            .border(2.dp, LufickEmerald, RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Box(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f)).padding(horizontal = 16.dp, vertical = 4.dp).clip(RoundedCornerShape(8.dp))) {
+                            Text(
+                                text = if (uiState.currentSide == IdCardSide.FRONT) "FRONT OF CARD" else "BACK OF CARD",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
+                
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Shutter Button
                 Box(
@@ -106,10 +124,12 @@ fun IdCardScannerScreen(
                         .clip(CircleShape)
                         .background(LufickEmerald.copy(alpha = 0.3f))
                         .clickable {
-                            if (uiState.currentSide == IdCardSide.FRONT) {
-                                viewModel.onFrontCaptured("front_id.jpg")
-                            } else {
-                                viewModel.onBackCaptured("back_id.jpg")
+                            cameraHandler?.capturePhoto { capturedPath ->
+                                if (uiState.currentSide == IdCardSide.FRONT) {
+                                    viewModel.onFrontCaptured(capturedPath)
+                                } else {
+                                    viewModel.onBackCaptured(capturedPath)
+                                }
                             }
                         }
                         .padding(4.dp),
@@ -132,31 +152,16 @@ fun IdCardScannerScreen(
                         .background(Color.White)
                         .padding(16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceEvenly,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Front ID Frame
-                        Box(
-                            modifier = Modifier
-                                .size(240.dp, 140.dp)
-                                .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF1F5F9)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("FRONT SIDE SCANNED", fontSize = 10.sp, color = Color.DarkGray)
-                        }
-
-                        // Back ID Frame
-                        Box(
-                            modifier = Modifier
-                                .size(240.dp, 140.dp)
-                                .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF1F5F9)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("BACK SIDE SCANNED", fontSize = 10.sp, color = Color.DarkGray)
+                    // Render stitched image if available
+                    if (uiState.stitchedImagePath != null) {
+                        LocalImage(
+                            path = uiState.stitchedImagePath!!,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // Stitching in progress
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Processing...", color = Color.Gray)
                         }
                     }
                 }

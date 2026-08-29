@@ -1,7 +1,12 @@
 package com.lufick.docscanner.platform
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -23,22 +28,64 @@ actual class PlatformImageProcessor(private val context: Context) {
         corners: QuadCorners,
         rotationDegrees: Int
     ): String = withContext(Dispatchers.IO) {
-        val outFile = File(context.filesDir, "warped_${System.currentTimeMillis()}.jpg")
-        val width = 1200
-        val height = 1600
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(android.graphics.Color.WHITE)
+        val sourceFile = File(sourceImagePath)
+        if (!sourceFile.exists()) return@withContext sourceImagePath // Fallback if missing
+        
+        val originalBitmap = BitmapFactory.decodeFile(sourceFile.absolutePath) ?: return@withContext sourceImagePath
+        
+        val width = originalBitmap.width.toFloat()
+        val height = originalBitmap.height.toFloat()
 
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = android.graphics.Color.DKGRAY
-        paint.textSize = 32f
-        canvas.drawText("DocScanner Warped Page", 100f, 200f, paint)
+        // Source points (the quadrilateral drawn by the user)
+        val srcPoints = floatArrayOf(
+            corners.topLeft.x * width, corners.topLeft.y * height,
+            corners.topRight.x * width, corners.topRight.y * height,
+            corners.bottomRight.x * width, corners.bottomRight.y * height,
+            corners.bottomLeft.x * width, corners.bottomLeft.y * height
+        )
 
-        FileOutputStream(outFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        // Calculate destination dimensions (approximated based on corner distances)
+        val topWidth = Math.hypot((srcPoints[2] - srcPoints[0]).toDouble(), (srcPoints[3] - srcPoints[1]).toDouble())
+        val bottomWidth = Math.hypot((srcPoints[6] - srcPoints[4]).toDouble(), (srcPoints[7] - srcPoints[5]).toDouble())
+        val destWidth = Math.max(topWidth, bottomWidth).toInt().coerceAtLeast(1)
+
+        val leftHeight = Math.hypot((srcPoints[6] - srcPoints[0]).toDouble(), (srcPoints[7] - srcPoints[1]).toDouble())
+        val rightHeight = Math.hypot((srcPoints[4] - srcPoints[2]).toDouble(), (srcPoints[5] - srcPoints[3]).toDouble())
+        val destHeight = Math.max(leftHeight, rightHeight).toInt().coerceAtLeast(1)
+
+        val dstPoints = floatArrayOf(
+            0f, 0f,
+            destWidth.toFloat(), 0f,
+            destWidth.toFloat(), destHeight.toFloat(),
+            0f, destHeight.toFloat()
+        )
+
+        val matrix = Matrix()
+        matrix.setPolyToPoly(srcPoints, 0, dstPoints, 0, 4)
+
+        // Output bitmap
+        var resultBitmap = Bitmap.createBitmap(destWidth, destHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(resultBitmap)
+        
+        // Draw the transformed image onto the canvas
+        canvas.drawBitmap(originalBitmap, matrix, null)
+        
+        // Apply rotation if needed
+        if (rotationDegrees != 0) {
+            val rotMatrix = Matrix()
+            rotMatrix.postRotate(rotationDegrees.toFloat())
+            val rotated = Bitmap.createBitmap(resultBitmap, 0, 0, resultBitmap.width, resultBitmap.height, rotMatrix, true)
+            resultBitmap.recycle()
+            resultBitmap = rotated
         }
-        bitmap.recycle()
+
+        originalBitmap.recycle()
+
+        val outFile = File(context.filesDir, "warped_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(outFile).use { out ->
+            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        resultBitmap.recycle()
         outFile.absolutePath
     }
 
@@ -48,6 +95,11 @@ actual class PlatformImageProcessor(private val context: Context) {
         brightness: Float,
         contrast: Float
     ): String = withContext(Dispatchers.IO) {
+        val sourceFile = File(imagePath)
+        if (!sourceFile.exists()) return@withContext imagePath
+        
+        val originalBitmap = BitmapFactory.decodeFile(sourceFile.absolutePath) ?: return@withContext imagePath
+        
         val outFile = File(context.filesDir, "filtered_${System.currentTimeMillis()}.jpg")
         val matrix = FilterEngine.getColorMatrixForFilter(filter, brightness, contrast).values
         val cm = ColorMatrix(matrix)
@@ -55,15 +107,19 @@ actual class PlatformImageProcessor(private val context: Context) {
             colorFilter = ColorMatrixColorFilter(cm)
         }
 
-        val bitmap = Bitmap.createBitmap(1200, 1600, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(android.graphics.Color.WHITE)
-        canvas.drawRect(0f, 0f, 1200f, 1600f, filterPaint)
+        val resultBitmap = Bitmap.createBitmap(originalBitmap.width, originalBitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(resultBitmap)
+        
+        // Draw the original bitmap with the filter paint
+        canvas.drawBitmap(originalBitmap, 0f, 0f, filterPaint)
 
         FileOutputStream(outFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
         }
-        bitmap.recycle()
+        
+        originalBitmap.recycle()
+        resultBitmap.recycle()
+        
         outFile.absolutePath
     }
 
@@ -74,25 +130,37 @@ actual class PlatformImageProcessor(private val context: Context) {
         val outFile = File(context.filesDir, "id_card_${System.currentTimeMillis()}.jpg")
         val a4Width = 1240
         val a4Height = 1754
-        val bitmap = Bitmap.createBitmap(a4Width, a4Height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
+        val resultBitmap = Bitmap.createBitmap(a4Width, a4Height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(resultBitmap)
         canvas.drawColor(android.graphics.Color.WHITE)
 
-        val borderPaint = Paint().apply {
-            color = android.graphics.Color.LTGRAY
-            style = Paint.Style.STROKE
-            strokeWidth = 4f
-        }
+        val frontBitmap = BitmapFactory.decodeFile(File(frontImagePath).absolutePath)
+        val backBitmap = BitmapFactory.decodeFile(File(backImagePath).absolutePath)
 
-        // Top Frame (Front ID)
-        canvas.drawRect(120f, 150f, 1120f, 750f, borderPaint)
-        // Bottom Frame (Back ID)
-        canvas.drawRect(120f, 950f, 1120f, 1550f, borderPaint)
+        // Draw Front ID to top half
+        if (frontBitmap != null) {
+            val frontDest = android.graphics.Rect(120, 150, 1120, 750)
+            canvas.drawBitmap(frontBitmap, null, frontDest, null)
+            frontBitmap.recycle()
+        }
+        
+        // Draw Back ID to bottom half
+        if (backBitmap != null) {
+            val backDest = android.graphics.Rect(120, 950, 1120, 1550)
+            canvas.drawBitmap(backBitmap, null, backDest, null)
+            backBitmap.recycle()
+        }
 
         FileOutputStream(outFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
         }
-        bitmap.recycle()
+        resultBitmap.recycle()
         outFile.absolutePath
     }
+}
+
+@Composable
+actual fun rememberPlatformImageProcessor(): PlatformImageProcessor {
+    val context = LocalContext.current
+    return remember { PlatformImageProcessor(context) }
 }

@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lufick.docscanner.engine.RenderedDocumentView
+import com.lufick.docscanner.platform.LocalImage
 import com.lufick.docscanner.theme.LufickEmerald
 import com.lufick.docscanner.ui.components.LufickTopBar
 import com.lufick.docscanner.ui.components.QuadCropCanvas
@@ -91,11 +91,7 @@ fun CropScreen(
                 contentAlignment = Alignment.Center
             ) {
                 // Real Rendered Document Underneath
-                RenderedDocumentView(
-                    modifier = Modifier.fillMaxSize(),
-                    templateType = uiState.templateType,
-                    rotationDegrees = uiState.rotationDegrees
-                )
+                com.lufick.docscanner.platform.LocalImage(path = uiState.imagePath, modifier = Modifier.fillMaxSize().padding(24.dp))
 
                 // Interactive 4-point Quad with Loupe Magnifier
                 QuadCropCanvas(

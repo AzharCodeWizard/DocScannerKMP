@@ -27,6 +27,7 @@ import com.lufick.docscanner.viewmodel.DocumentDetailViewModel
 import com.lufick.docscanner.viewmodel.FilterViewModel
 import com.lufick.docscanner.viewmodel.HomeViewModel
 import com.lufick.docscanner.viewmodel.IdCardViewModel
+import com.lufick.docscanner.platform.rememberPlatformImageProcessor
 import com.lufick.docscanner.viewmodel.OcrViewModel
 import com.lufick.docscanner.viewmodel.PdfToolsViewModel
 import kotlinx.coroutines.launch
@@ -44,7 +45,8 @@ fun DocScannerApp() {
     val detailViewModel = remember { DocumentDetailViewModel(repository) }
     val ocrViewModel = remember { OcrViewModel() }
     val pdfToolsViewModel = remember { PdfToolsViewModel() }
-    val idCardViewModel = remember { IdCardViewModel() }
+    val imageProcessor = rememberPlatformImageProcessor()
+    val idCardViewModel = remember { IdCardViewModel(imageProcessor) }
 
     DocScannerTheme {
         NavHost(
