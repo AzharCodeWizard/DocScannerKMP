@@ -1,15 +1,14 @@
 package com.lufick.docscanner.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.lufick.docscanner.engine.DocumentTemplateType
+import androidx.lifecycle.viewModelScope
 import com.lufick.docscanner.model.PointF
 import com.lufick.docscanner.model.QuadCorners
 import com.lufick.docscanner.platform.PlatformImageProcessor
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class CropAspectRatio(val displayName: String, val ratio: Float?) {
     FREE("Free", null),
@@ -21,7 +20,6 @@ enum class CropAspectRatio(val displayName: String, val ratio: Float?) {
 
 data class CropUiState(
     val imagePath: String = "",
-    val templateType: DocumentTemplateType = DocumentTemplateType.RECEIPT,
     val corners: QuadCorners = QuadCorners(
         topLeft = PointF(0.06f, 0.08f),
         topRight = PointF(0.94f, 0.08f),
@@ -40,7 +38,6 @@ class CropViewModel(private val imageProcessor: PlatformImageProcessor? = null) 
 
     fun setImage(
         path: String,
-        template: DocumentTemplateType = DocumentTemplateType.RECEIPT,
         initialCorners: QuadCorners? = null
     ) {
         val defaultQuad = initialCorners ?: QuadCorners(
@@ -51,7 +48,6 @@ class CropViewModel(private val imageProcessor: PlatformImageProcessor? = null) 
         )
         _uiState.value = _uiState.value.copy(
             imagePath = path,
-            templateType = template,
             rotationDegrees = 0,
             corners = defaultQuad
         )

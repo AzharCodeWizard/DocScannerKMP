@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.lufick.docscanner.engine.DocumentTemplateType
 import com.lufick.docscanner.model.Document
 import com.lufick.docscanner.model.ScannedPage
 import com.lufick.docscanner.model.ScanMode
@@ -89,17 +88,9 @@ fun DocScannerApp() {
                     CameraScreen(
                         viewModel = cameraViewModel,
                         onClose = { navController.popBackStack() },
-                        onNavigateToCrop = {
-                            val lastCaptured = cameraViewModel.uiState.value.capturedImages.lastOrNull() ?: "scan_page_1.jpg"
-                            val template = when (cameraViewModel.uiState.value.scanMode) {
-                                ScanMode.DOCUMENT -> DocumentTemplateType.RECEIPT
-                                ScanMode.ID_CARD -> DocumentTemplateType.ID_CARD
-                                ScanMode.BOOK -> DocumentTemplateType.LEASE_CONTRACT
-                                ScanMode.PASSPORT -> DocumentTemplateType.PASSPORT
-                                ScanMode.QR_CODE -> DocumentTemplateType.RECEIPT
-                            }
+                        onNavigateToCrop = { capturedPath ->
                             val detectedCorners = cameraViewModel.uiState.value.detectedQuad
-                            cropViewModel.setImage(lastCaptured, template, initialCorners = detectedCorners)
+                            cropViewModel.setImage(capturedPath, initialCorners = detectedCorners)
                             navController.navigate(Screen.Crop.route)
                         }
                     )
@@ -123,7 +114,6 @@ fun DocScannerApp() {
                                 }
                                 filterViewModel.setImage(
                                     path = warpedPath,
-                                    template = cropState.templateType,
                                     corners = cropState.corners,
                                     rotation = 0
                                 )
@@ -151,9 +141,10 @@ fun DocScannerApp() {
                                 } else {
                                     filterState.imagePath
                                 }
-                                val newDocId = "doc_" + currentTimeMillis()
+                                val now = currentTimeMillis()
+                                val newDocId = "doc_$now"
                                 val newPage = ScannedPage(
-                                    id = "p_" + currentTimeMillis(),
+                                    id = "p_$now",
                                     pageNumber = 1,
                                     originalImagePath = filterState.imagePath,
                                     processedImagePath = processedPath,
@@ -162,25 +153,18 @@ fun DocScannerApp() {
                                     filterType = filterState.selectedFilter,
                                     brightness = filterState.brightness,
                                     contrast = filterState.contrast,
-                                    ocrText = "WHOLE FOODS MARKET\nDate: Oct 25, 2026\nTotal: $37.04",
-                                    createdAt = currentTimeMillis()
+                                    ocrText = "",
+                                    createdAt = now
                                 )
-                                val title = when (filterState.templateType) {
-                                    DocumentTemplateType.RECEIPT -> "Whole Foods Receipt"
-                                    DocumentTemplateType.LEASE_CONTRACT -> "Lease Contract"
-                                    DocumentTemplateType.ID_CARD -> "Driver License ID"
-                                    DocumentTemplateType.PASSPORT -> "Passport Scan"
-                                    DocumentTemplateType.MEDICAL_PRESCRIPTION -> "Medical Prescription"
-                                }
                                 val newDoc = Document(
                                     id = newDocId,
-                                    title = title,
-                                    folderId = "f_receipts",
-                                    tags = listOf("New Scan", "Enhanced"),
+                                    title = "Scanned Doc ${homeViewModel.filteredDocuments.value.size + 1}",
+                                    folderId = "f_all",
+                                    tags = listOf("New Scan", filterState.selectedFilter.displayName),
                                     pages = listOf(newPage),
-                                    createdAt = currentTimeMillis(),
-                                    updatedAt = currentTimeMillis(),
-                                    isFavorite = true
+                                    createdAt = now,
+                                    updatedAt = now,
+                                    isFavorite = false
                                 )
                                 repository.saveDocument(newDoc)
                                 navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -190,7 +174,7 @@ fun DocScannerApp() {
                 }
 
                 composable(Screen.DocumentDetail.route) { backStackEntry ->
-                    val docId = backStackEntry.arguments?.getString("docId") ?: "doc_1"
+                    val docId = backStackEntry.arguments?.getString("docId") ?: ""
                     DocumentDetailScreen(
                         docId = docId,
                         viewModel = detailViewModel,
@@ -202,10 +186,11 @@ fun DocScannerApp() {
                 }
 
                 composable(Screen.Ocr.route) { backStackEntry ->
-                    val docId = backStackEntry.arguments?.getString("docId") ?: "doc_1"
+                    val docId = backStackEntry.arguments?.getString("docId") ?: ""
                     OcrScreen(
                         docId = docId,
                         viewModel = ocrViewModel,
+                        repository = repository,
                         onBack = { navController.popBackStack() }
                     )
                 }

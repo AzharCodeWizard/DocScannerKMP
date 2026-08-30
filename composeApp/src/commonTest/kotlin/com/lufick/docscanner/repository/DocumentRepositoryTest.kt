@@ -13,7 +13,7 @@ class DocumentRepositoryTest {
     fun testRepositoryOperations() = runTest {
         val repo = InMemoryDocumentRepository()
         val initialDocs = repo.getAllDocuments().first()
-        assertTrue(initialDocs.isNotEmpty())
+        assertTrue(initialDocs.isEmpty())
 
         val newDoc = Document(
             id = "test_doc_1",

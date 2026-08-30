@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -148,64 +149,37 @@ fun DocumentDetailScreen(
             ) {
                 // Large Active Page Preview
                 val activePage = doc.pages.getOrNull(uiState.selectedPageIndex)
+                val imgPath = activePage?.processedImagePath?.ifBlank { activePage.originalImagePath } ?: ""
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White)
+                        .background(Color(0xFF0F172A))
                         .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (activePage != null && activePage.processedImagePath.isNotEmpty() && !activePage.processedImagePath.startsWith("placeholder")) {
+                    if (imgPath.isNotBlank()) {
                         LocalImage(
-                            path = activePage.processedImagePath,
-                            modifier = Modifier.fillMaxSize()
+                            path = imgPath,
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            rotationDegrees = activePage?.rotationDegrees ?: 0
                         )
                     } else {
                         // High quality document placeholder
                         Column(
                             modifier = Modifier.fillMaxSize().padding(24.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "${doc.title} • Page ${uiState.selectedPageIndex + 1}",
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Black,
+                                color = Color.White,
                                 fontSize = 16.sp
                             )
-                            if (!activePage?.ocrText.isNullOrEmpty()) {
-                                Text(
-                                    text = activePage?.ocrText ?: "",
-                                    color = Color.DarkGray,
-                                    fontSize = 12.sp,
-                                    lineHeight = 18.sp
-                                )
-                            } else {
-                                Text("High-resolution digitized scan ready for export.", color = Color.Gray, fontSize = 13.sp)
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Filter: ${activePage?.filterType?.displayName ?: "Magic Color"}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (isSignatureAdded) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text("✓ Digitally Signed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            }
                         }
                     }
                 }

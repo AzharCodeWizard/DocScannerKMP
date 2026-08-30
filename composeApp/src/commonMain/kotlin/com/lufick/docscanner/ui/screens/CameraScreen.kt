@@ -74,7 +74,7 @@ import com.lufick.docscanner.viewmodel.FlashMode
 fun CameraScreen(
     viewModel: CameraViewModel,
     onClose: () -> Unit,
-    onNavigateToCrop: () -> Unit
+    onNavigateToCrop: (capturedPath: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var cameraHandler by remember { mutableStateOf<PlatformCameraHandler?>(null) }
@@ -89,7 +89,7 @@ fun CameraScreen(
                 viewModel.onPhotoCaptured(capturedPath)
                 isCapturing = false
                 if (!uiState.isBatchMode) {
-                    onNavigateToCrop()
+                    onNavigateToCrop(capturedPath)
                 }
             }
         }
@@ -352,7 +352,10 @@ fun CameraScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     thumbnails = uiState.capturedImages,
                     onRemoveThumbnail = { viewModel.removeCapturedPage(it) },
-                    onThumbnailClick = { onNavigateToCrop() }
+                    onThumbnailClick = {
+                        val path = uiState.capturedImages.lastOrNull() ?: ""
+                        if (path.isNotBlank()) onNavigateToCrop(path)
+                    }
                 )
             }
 
@@ -396,9 +399,19 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gallery Import Button
+                // Gallery / Recent Batch Import Button
                 IconButton(
-                    onClick = onNavigateToCrop,
+                    onClick = {
+                        val lastImg = uiState.capturedImages.lastOrNull()
+                        if (lastImg != null) {
+                            onNavigateToCrop(lastImg)
+                        } else {
+                            cameraHandler?.capturePhoto { capturedPath ->
+                                viewModel.onPhotoCaptured(capturedPath)
+                                onNavigateToCrop(capturedPath)
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .size(54.dp)
                         .clip(RoundedCornerShape(18.dp))
@@ -423,7 +436,7 @@ fun CameraScreen(
                         cameraHandler?.capturePhoto { capturedPath ->
                             viewModel.onPhotoCaptured(capturedPath)
                             if (!uiState.isBatchMode) {
-                                onNavigateToCrop()
+                                onNavigateToCrop(capturedPath)
                             }
                         }
                     }
@@ -452,7 +465,12 @@ fun CameraScreen(
                             color = if (hasBatchPages) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(18.dp)
                         )
-                        .clickable { onNavigateToCrop() }
+                        .clickable {
+                            val last = uiState.capturedImages.lastOrNull()
+                            if (last != null) {
+                                onNavigateToCrop(last)
+                            }
+                        }
                         .padding(horizontal = if (hasBatchPages) 12.dp else 0.dp),
                     contentAlignment = Alignment.Center
                 ) {

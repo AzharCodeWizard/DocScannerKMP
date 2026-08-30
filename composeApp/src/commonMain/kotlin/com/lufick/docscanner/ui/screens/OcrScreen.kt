@@ -38,30 +38,45 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lufick.docscanner.platform.PlatformOcrEngine
+import com.lufick.docscanner.platform.rememberPlatformOcrEngine
 import com.lufick.docscanner.platform.rememberPlatformShare
+import com.lufick.docscanner.repository.DocumentRepository
 import com.lufick.docscanner.ui.components.LufickTopBar
 import com.lufick.docscanner.viewmodel.OcrViewModel
+import kotlinx.coroutines.flow.firstOrNull
 
 @Composable
 fun OcrScreen(
     docId: String,
     viewModel: OcrViewModel,
+    repository: DocumentRepository,
+    ocrEngine: PlatformOcrEngine = rememberPlatformOcrEngine(),
     onBack: () -> Unit
 ) {
     val platformShare = rememberPlatformShare()
 
     LaunchedEffect(docId) {
-        val sampleReceiptText = """WHOLE FOODS MARKET
-Date: Oct 25, 2026   Inv #84920
-1x Organic Oat Milk         $4.99
-2x Hass Avocados            $3.50
-1x Sourdough Artisan Bread  $5.25
-1x Ceremonial Matcha Tea   $12.99
----------------------------------
-TOTAL DUE                  $26.73
-Tax Included (8.25%)        $2.04
-Thank you for shopping at Whole Foods!"""
-        viewModel.loadOcrData(sampleReceiptText)
+        val doc = repository.getDocumentById(docId).firstOrNull()
+        val firstPage = doc?.pages?.firstOrNull()
+        if (firstPage != null) {
+            if (!firstPage.ocrText.isNullOrBlank()) {
+                viewModel.loadOcrData(firstPage.ocrText)
+            } else {
+                val imagePath = firstPage.processedImagePath.ifBlank { firstPage.originalImagePath }
+                if (imagePath.isNotBlank()) {
+                    val result = ocrEngine.recognizeText(imagePath)
+                    viewModel.loadOcrData(result.fullText)
+                    if (result.fullText.isNotBlank()) {
+                        repository.updatePage(docId, firstPage.copy(ocrText = result.fullText))
+                    }
+                } else {
+                    viewModel.loadOcrData("No image found for this document page.")
+                }
+            }
+        } else {
+            viewModel.loadOcrData("Document not found.")
+        }
     }
 
     val uiState by viewModel.uiState.collectAsState()

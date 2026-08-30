@@ -17,16 +17,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lufick.docscanner.engine.FilterEngine
-import com.lufick.docscanner.engine.RenderedDocumentView
 import com.lufick.docscanner.model.FilterType
 import com.lufick.docscanner.platform.LocalImage
 import com.lufick.docscanner.theme.LufickEmerald
@@ -112,17 +111,50 @@ fun FilterScreen(
 
                     Spacer(modifier = Modifier.width(4.dp))
 
-                    // Primary Save Doc Button
+                    // Quick Top Save Icon
+                    IconButton(onClick = onDone) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Save",
+                            tint = LufickEmerald
+                        )
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            androidx.compose.material3.Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = onBack,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(0.35f)
+                    ) {
+                        Text("Retake", fontSize = 13.sp)
+                    }
+
                     Button(
                         onClick = onDone,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = LufickEmerald),
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.weight(0.65f)
                     ) {
-                        Text("Save Doc", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save Document", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
-            )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -153,15 +185,7 @@ fun FilterScreen(
                         rotationDegrees = uiState.rotationDegrees
                     )
                 } else {
-                    // Fallback to Interactive Template Preview
-                    RenderedDocumentView(
-                        modifier = Modifier.fillMaxSize(),
-                        templateType = uiState.templateType,
-                        filterType = if (uiState.isComparisonMode) FilterType.ORIGINAL else uiState.selectedFilter,
-                        brightness = uiState.brightness,
-                        contrast = uiState.contrast,
-                        rotationDegrees = uiState.rotationDegrees
-                    )
+                    CircularProgressIndicator(color = LufickEmerald)
                 }
 
                 // Active Preset Status Pill in Top-Left

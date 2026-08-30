@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lufick.docscanner.model.Document
+import com.lufick.docscanner.platform.LocalImage
 import com.lufick.docscanner.theme.LufickEmerald
 
 @Composable
@@ -46,6 +47,9 @@ fun DocCard(
     onFavoriteToggle: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
+    val firstPage = document.pages.firstOrNull()
+    val imagePath = firstPage?.processedImagePath?.ifBlank { firstPage.originalImagePath } ?: ""
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -59,43 +63,57 @@ fun DocCard(
     ) {
         if (isGridView) {
             Column(modifier = Modifier.padding(10.dp)) {
-                // Thumbnail Box
+                // Real Image Thumbnail Box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(150.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White),
+                        .background(Color(0xFF0F172A)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Document Preview Representation
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = document.title.uppercase(),
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.DarkGray,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    if (imagePath.isNotBlank()) {
+                        LocalImage(
+                            path = imagePath,
+                            modifier = Modifier.fillMaxSize(),
+                            rotationDegrees = firstPage?.rotationDegrees ?: 0
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Box(modifier = Modifier.fillMaxWidth(0.9f).height(3.dp).background(Color.LightGray))
-                            Box(modifier = Modifier.fillMaxWidth(0.7f).height(3.dp).background(Color.LightGray))
-                            Box(modifier = Modifier.fillMaxWidth(0.85f).height(3.dp).background(Color.LightGray))
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    } else {
+                        // Clean Document Icon & Title Placeholder
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text("PAGE 1", fontSize = 6.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                            if (document.isEncrypted) {
-                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(10.dp), tint = Color.Gray)
-                            }
+                            Icon(
+                                Icons.Default.Description,
+                                contentDescription = null,
+                                tint = LufickEmerald,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = document.title,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Encryption Lock Icon if applicable
+                    if (document.isEncrypted) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .padding(4.dp)
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = "Encrypted", modifier = Modifier.size(12.dp), tint = Color.Yellow)
                         }
                     }
 
@@ -106,7 +124,7 @@ fun DocCard(
                             .padding(6.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "${document.pageCount} ${if (document.pageCount == 1) "Page" else "Pages"}",
@@ -182,16 +200,23 @@ fun DocCard(
                     modifier = Modifier
                         .size(54.dp, 68.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .padding(4.dp),
+                        .background(Color(0xFF0F172A)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = document.title.take(2).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = Color.DarkGray,
-                        fontSize = 12.sp
-                    )
+                    if (imagePath.isNotBlank()) {
+                        LocalImage(
+                            path = imagePath,
+                            modifier = Modifier.fillMaxSize(),
+                            rotationDegrees = firstPage?.rotationDegrees ?: 0
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            tint = LufickEmerald,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -205,7 +230,7 @@ fun DocCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${document.pageCount} Pages • ${(document.pages.size * 240)} KB",
+                        text = "${document.pageCount} ${if (document.pageCount == 1) "Page" else "Pages"}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -222,3 +247,4 @@ fun DocCard(
         }
     }
 }
+
