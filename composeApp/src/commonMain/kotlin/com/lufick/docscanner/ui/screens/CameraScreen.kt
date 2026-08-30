@@ -112,6 +112,7 @@ fun CameraScreen(
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
             flashEnabled = uiState.flashMode == FlashMode.ON || uiState.flashMode == FlashMode.TORCH,
+            isQrScanMode = (uiState.scanMode == ScanMode.QR_CODE),
             onEdgeDetected = { viewModel.onEdgeDetected(it) },
             onCameraBind = { handler -> cameraHandler = handler }
         )

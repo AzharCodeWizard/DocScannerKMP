@@ -7,8 +7,10 @@ import android.util.Log
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -21,8 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -30,16 +30,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import com.lufick.docscanner.model.PointF
 import com.lufick.docscanner.model.QuadCorners
-import com.lufick.docscanner.theme.LufickEmerald
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -49,7 +50,9 @@ private const val TAG = "DocScannerCamera"
 actual fun CameraPreview(
     modifier: Modifier,
     flashEnabled: Boolean,
+    isQrScanMode: Boolean,
     onEdgeDetected: (QuadCorners) -> Unit,
+    onQrDetected: (payload: String, qrBoundingRatio: Float) -> Unit,
     onCameraBind: (PlatformCameraHandler) -> Unit
 ) {
     val context = LocalContext.current
@@ -90,8 +93,9 @@ actual fun CameraPreview(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text("Camera Permission Required", color = Color.White)
+                Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Grant")
+                    Text("Grant Permission")
                 }
             }
         }
@@ -99,7 +103,21 @@ actual fun CameraPreview(
         var cameraInstance by remember { mutableStateOf<Camera?>(null) }
         val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
 
-        LaunchedEffect(imageCapture) {
+        val barcodeScanner = remember {
+            val options = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_QR_CODE,
+                    Barcode.FORMAT_DATA_MATRIX,
+                    Barcode.FORMAT_AZTEC,
+                    Barcode.FORMAT_CODE_128,
+                    Barcode.FORMAT_EAN_13,
+                    Barcode.FORMAT_UPC_A
+                )
+                .build()
+            BarcodeScanning.getClient(options)
+        }
+
+        LaunchedEffect(imageCapture, cameraInstance) {
             onCameraBind(AndroidPlatformCameraHandler(context, imageCapture, cameraInstance))
         }
 
@@ -117,6 +135,7 @@ actual fun CameraPreview(
 
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 val executor = ContextCompat.getMainExecutor(ctx)
+                val analysisExecutor = Executors.newSingleThreadExecutor()
 
                 cameraProviderFuture.addListener({
                     try {
@@ -129,21 +148,17 @@ actual fun CameraPreview(
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
                             .also { analysis ->
-                                analysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
+                                analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                                     try {
-                                        val detectedQuad = analyzeDocumentEdges(imageProxy)
-                                        onEdgeDetected(detectedQuad)
+                                        if (isQrScanMode) {
+                                            analyzeQrAndAutoZoom(imageProxy, barcodeScanner, cameraInstance, onQrDetected)
+                                        } else {
+                                            val detectedQuad = analyzeDocumentEdges(imageProxy)
+                                            onEdgeDetected(detectedQuad)
+                                            imageProxy.close()
+                                        }
                                     } catch (e: Exception) {
-                                        onEdgeDetected(
-                                            QuadCorners(
-                                                topLeft = PointF(0.08f, 0.12f),
-                                                topRight = PointF(0.92f, 0.12f),
-                                                bottomRight = PointF(0.92f, 0.62f),
-                                                bottomLeft = PointF(0.08f, 0.62f)
-                                            )
-                                        )
-                                    } finally {
-                                        imageProxy.close()
+                                        try { imageProxy.close() } catch (_: Exception) {}
                                     }
                                 }
                             }
@@ -179,6 +194,55 @@ actual fun CameraPreview(
     }
 }
 
+@OptIn(ExperimentalGetImage::class)
+private fun analyzeQrAndAutoZoom(
+    imageProxy: androidx.camera.core.ImageProxy,
+    barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    camera: Camera?,
+    onQrDetected: (String, Float) -> Unit
+) {
+    val mediaImage = imageProxy.image
+    if (mediaImage == null) {
+        imageProxy.close()
+        return
+    }
+
+    val rotation = imageProxy.imageInfo.rotationDegrees
+    val inputImage = InputImage.fromMediaImage(mediaImage, rotation)
+
+    barcodeScanner.process(inputImage)
+        .addOnSuccessListener { barcodes ->
+            val qr = barcodes.firstOrNull()
+            if (qr != null && !qr.rawValue.isNullOrBlank()) {
+                val box = qr.boundingBox
+                val isRotated = (rotation == 90 || rotation == 270)
+                val frameW = if (isRotated) imageProxy.height else imageProxy.width
+                val frameH = if (isRotated) imageProxy.width else imageProxy.height
+
+                val qrWidth = box?.width()?.toFloat() ?: (frameW * 0.25f)
+                val qrHeight = box?.height()?.toFloat() ?: (frameH * 0.25f)
+                val maxDim = Math.max(qrWidth, qrHeight)
+                val ratio = (maxDim / frameW.toFloat()).coerceIn(0.01f, 1.0f)
+
+                // Google Pay Auto-Zoom Algorithm:
+                // If QR code is far away / small (< 32% of frame width), auto-zoom in smoothly!
+                if (ratio < 0.32f && camera != null) {
+                    val zoomState = camera.cameraInfo.zoomState.value
+                    val currentZoom = zoomState?.zoomRatio ?: 1f
+                    val maxZoom = (zoomState?.maxZoomRatio ?: 4f).coerceAtMost(4.5f)
+                    
+                    val targetZoom = (currentZoom * (0.45f / ratio.coerceAtLeast(0.08f))).coerceIn(1.0f, maxZoom)
+                    camera.cameraControl.setZoomRatio(targetZoom)
+                }
+
+                onQrDetected(qr.rawValue!!, ratio)
+            }
+        }
+        .addOnCompleteListener {
+            imageProxy.close()
+        }
+}
+
 class AndroidPlatformCameraHandler(
     private val context: Context,
     private val imageCapture: ImageCapture? = null,
@@ -212,8 +276,15 @@ class AndroidPlatformCameraHandler(
     override fun toggleFlash(enabled: Boolean) {
         camera?.cameraControl?.enableTorch(enabled)
     }
-}
 
+    override fun setZoom(ratio: Float) {
+        camera?.cameraControl?.setZoomRatio(ratio)
+    }
+
+    override fun resetZoom() {
+        camera?.cameraControl?.setZoomRatio(1.0f)
+    }
+}
 
 private fun analyzeDocumentEdges(imageProxy: androidx.camera.core.ImageProxy): QuadCorners {
     val plane = imageProxy.planes[0]

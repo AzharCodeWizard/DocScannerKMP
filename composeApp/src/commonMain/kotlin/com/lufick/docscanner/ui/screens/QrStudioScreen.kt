@@ -1,6 +1,16 @@
 package com.lufick.docscanner.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +33,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Save
@@ -45,13 +60,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -365,62 +380,290 @@ fun QrStudioScreen(
                     }
                 }
             } else {
-                // QR Scanner View
+                // Google Pay Auto-Zooming QR Scanner View
                 var cameraHandler by remember { mutableStateOf<PlatformCameraHandler?>(null) }
+                val infiniteTransition = rememberInfiniteTransition()
+                val laserProgress by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1800, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
-                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black)
                 ) {
+                    // 1. Live Camera Preview with Auto-Zoom Analyzer
                     CameraPreview(
                         modifier = Modifier.fillMaxSize(),
+                        flashEnabled = uiState.flashEnabled,
+                        isQrScanMode = true,
+                        onQrDetected = { payload, ratio ->
+                            viewModel.onScanned(payload, ratio)
+                        },
                         onCameraBind = { handler -> cameraHandler = handler }
                     )
 
-                    // Scanner Reticle Overlay
+                    // 2. Top Viewfinder HUD Overlay (Auto-Zoom Badge + Flash Toggle)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Google Pay Auto-Zoom Pill
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .border(1.dp, LufickEmerald.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(LufickEmerald)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Auto-Zoom to QR (Google Pay)",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Torch Button
+                        IconButton(
+                            onClick = { viewModel.toggleFlash() },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                if (uiState.flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                                contentDescription = "Flash",
+                                tint = if (uiState.flashEnabled) LufickEmerald else Color.White
+                            )
+                        }
+                    }
+
+                    // 3. Central Google Pay Scanning Reticle
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .size(260.dp)
-                            .border(3.dp, LufickEmerald, RoundedCornerShape(24.dp)),
-                        contentAlignment = Alignment.Center
+                            .size(280.dp)
+                            .border(3.dp, LufickEmerald, RoundedCornerShape(24.dp))
                     ) {
+                        // Animated Scanning Laser Line
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(0.8f)
+                                .fillMaxWidth()
                                 .height(2.dp)
-                                .background(LufickEmerald)
+                                .align(Alignment.TopCenter)
+                                .padding(top = (280.dp * laserProgress).coerceIn(0.dp, 276.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            LufickEmerald,
+                                            Color.White,
+                                            LufickEmerald,
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
                         )
                     }
 
-                    // Scanned Content Banner
-                    Box(
+                    // 4. Quick Manual Zoom Controls Pill (1x, 2x, 3.5x)
+                    Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.Black.copy(alpha = 0.8f))
-                            .border(1.dp, LufickEmerald, RoundedCornerShape(16.dp))
-                            .padding(16.dp)
+                            .padding(bottom = if (uiState.scannedContent != null) 220.dp else 120.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color.Black.copy(alpha = 0.7f))
+                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Point camera at any QR Code or Barcode", color = Color.LightGray, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = {
-                                    viewModel.onScanned("https://docscanner.in/scanned_demo")
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = LufickEmerald),
-                                shape = RoundedCornerShape(10.dp)
+                        listOf(1.0f, 2.0f, 3.5f).forEach { zoom ->
+                            val isSelected = uiState.zoomRatio == zoom
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) LufickEmerald else Color.Transparent)
+                                    .clickable {
+                                        viewModel.setZoom(zoom)
+                                        cameraHandler?.setZoom(zoom)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                Text("Simulate QR Detection", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(
+                                    text = "${zoom}x",
+                                    color = if (isSelected) Color.Black else Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                            if (uiState.scannedContent != null) {
+                        }
+                    }
+
+                    // 5. Scanned Result Bottom Card (Google Pay Style)
+                    val scanned = uiState.scannedContent
+                    if (scanned != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF0F172A))
+                                .border(1.5.dp, LufickEmerald, RoundedCornerShape(20.dp))
+                                .padding(18.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = LufickEmerald,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "QR Code Detected",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.clearScanned()
+                                            cameraHandler?.resetZoom()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray)
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Text("Scanned: ${uiState.scannedContent}", color = LufickEmerald, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+                                // Content snippet box
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1E293B))
+                                        .padding(12.dp)
+                                ) {
+                                    Text(
+                                        text = scanned,
+                                        color = Color(0xFFE2E8F0),
+                                        fontSize = 12.sp,
+                                        maxLines = 4
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Action buttons
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(scanned))
+                                            copiedFeedback = true
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(if (copiedFeedback) "Copied" else "Copy", fontSize = 11.sp)
+                                    }
+
+                                    Button(
+                                        onClick = { platformShare.shareText(scanned) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Share", fontSize = 11.sp)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.saveScannedToVault("Scanned_QR") { docId ->
+                                                onNavigateToDetail(docId)
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = LufickEmerald),
+                                        modifier = Modifier.weight(1.3f)
+                                    ) {
+                                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Save Vault", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. If no QR scanned yet, show helper hint at bottom
+                    if (uiState.scannedContent == null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.Black.copy(alpha = 0.75f))
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                                .padding(14.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    "Point camera at any QR Code or Barcode",
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        viewModel.onScanned("https://docscanner.in/pay?amt=499&ref=TXN99281")
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, LufickEmerald),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoMode, contentDescription = null, tint = LufickEmerald, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Simulate Auto-Zoom & Scan", color = LufickEmerald, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                                }
                             }
                         }
                     }

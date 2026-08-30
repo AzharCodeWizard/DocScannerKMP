@@ -32,7 +32,11 @@ data class QrStudioUiState(
     val currentPayload: String = "https://docscanner.in",
     val qrMatrix: Array<BooleanArray> = QrCodeGenerator.generateQrMatrix("https://docscanner.in"),
     val scannedContent: String? = null,
-    val isSavedToVault: Boolean = false
+    val isSavedToVault: Boolean = false,
+    val flashEnabled: Boolean = false,
+    val zoomRatio: Float = 1.0f,
+    val autoZoomActive: Boolean = true,
+    val detectedQrBoundingRatio: Float = 0f
 )
 
 class QrStudioViewModel(private val repository: DocumentRepository? = null) : ViewModel() {
@@ -42,6 +46,18 @@ class QrStudioViewModel(private val repository: DocumentRepository? = null) : Vi
 
     fun setTab(tab: QrStudioTab) {
         _uiState.value = _uiState.value.copy(selectedTab = tab)
+    }
+
+    fun toggleFlash() {
+        _uiState.value = _uiState.value.copy(flashEnabled = !_uiState.value.flashEnabled)
+    }
+
+    fun setZoom(ratio: Float) {
+        _uiState.value = _uiState.value.copy(zoomRatio = ratio)
+    }
+
+    fun toggleAutoZoom() {
+        _uiState.value = _uiState.value.copy(autoZoomActive = !_uiState.value.autoZoomActive)
     }
 
     fun setContentType(type: QrContentType) {
@@ -89,12 +105,15 @@ class QrStudioViewModel(private val repository: DocumentRepository? = null) : Vi
         _uiState.value = _uiState.value.copy(upiConfig = upi, currentPayload = payload, qrMatrix = matrix)
     }
 
-    fun onScanned(rawContent: String) {
-        _uiState.value = _uiState.value.copy(scannedContent = rawContent)
+    fun onScanned(rawContent: String, qrBoundingRatio: Float = 0.5f) {
+        _uiState.value = _uiState.value.copy(
+            scannedContent = rawContent,
+            detectedQrBoundingRatio = qrBoundingRatio
+        )
     }
 
     fun clearScanned() {
-        _uiState.value = _uiState.value.copy(scannedContent = null)
+        _uiState.value = _uiState.value.copy(scannedContent = null, detectedQrBoundingRatio = 0f)
     }
 
     fun saveQrToVault(title: String, onSaved: (String) -> Unit) {
@@ -131,6 +150,43 @@ class QrStudioViewModel(private val repository: DocumentRepository? = null) : Vi
 
             repo.saveDocument(doc)
             _uiState.value = _uiState.value.copy(isSavedToVault = true)
+            onSaved(docId)
+        }
+    }
+
+    fun saveScannedToVault(title: String, onSaved: (String) -> Unit) {
+        val repo = repository ?: return
+        val payload = _uiState.value.scannedContent ?: return
+
+        viewModelScope.launch {
+            val now = currentTimeMillis()
+            val docId = "scan_qr_$now"
+            val page = ScannedPage(
+                id = "p_scanned_$now",
+                pageNumber = 1,
+                originalImagePath = "",
+                processedImagePath = "",
+                cropCorners = QuadCorners(PointF(0f, 0f), PointF(1f, 0f), PointF(1f, 1f), PointF(0f, 1f)),
+                rotationDegrees = 0,
+                filterType = FilterType.ORIGINAL,
+                brightness = 0f,
+                contrast = 1f,
+                ocrText = "SCANNED QR / BARCODE RESULT\nContent:\n$payload",
+                createdAt = now
+            )
+
+            val doc = Document(
+                id = docId,
+                title = title.ifBlank { "Scanned QR Code" },
+                folderId = "f_all",
+                tags = listOf("Scanned QR", "Barcode"),
+                pages = listOf(page),
+                createdAt = now,
+                updatedAt = now,
+                isFavorite = false
+            )
+
+            repo.saveDocument(doc)
             onSaved(docId)
         }
     }

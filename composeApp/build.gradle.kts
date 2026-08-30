@@ -59,6 +59,7 @@ kotlin {
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.view)
             implementation(libs.google.mlkit.text.recognition)
+            implementation(libs.google.mlkit.barcode.scanning)
             implementation(libs.koin.android)
         }
 
