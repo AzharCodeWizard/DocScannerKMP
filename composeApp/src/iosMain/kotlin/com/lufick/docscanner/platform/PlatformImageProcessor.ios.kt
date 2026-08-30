@@ -21,7 +21,8 @@ actual class PlatformImageProcessor {
         imagePath: String,
         filter: FilterType,
         brightness: Float,
-        contrast: Float
+        contrast: Float,
+        saturation: Float
     ): String {
         return "ios_filtered_${currentTimeMillis()}.jpg"
     }

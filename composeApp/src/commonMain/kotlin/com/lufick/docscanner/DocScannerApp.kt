@@ -111,13 +111,24 @@ fun DocScannerApp() {
                         onBack = { navController.popBackStack() },
                         onNavigateToFilter = {
                             val cropState = cropViewModel.uiState.value
-                            filterViewModel.setImage(
-                                path = cropState.imagePath,
-                                template = cropState.templateType,
-                                corners = cropState.corners,
-                                rotation = cropState.rotationDegrees
-                            )
-                            navController.navigate(Screen.Filter.route)
+                            scope.launch {
+                                val warpedPath = if (cropState.imagePath.isNotBlank() && !cropState.imagePath.startsWith("scan_page_")) {
+                                    imageProcessor.applyPerspectiveWarp(
+                                        sourceImagePath = cropState.imagePath,
+                                        corners = cropState.corners,
+                                        rotationDegrees = cropState.rotationDegrees
+                                    )
+                                } else {
+                                    cropState.imagePath
+                                }
+                                filterViewModel.setImage(
+                                    path = warpedPath,
+                                    template = cropState.templateType,
+                                    corners = cropState.corners,
+                                    rotation = 0
+                                )
+                                navController.navigate(Screen.Filter.route)
+                            }
                         }
                     )
                 }
@@ -128,41 +139,52 @@ fun DocScannerApp() {
                         onBack = { navController.popBackStack() },
                         onDone = {
                             val filterState = filterViewModel.uiState.value
-                            val newDocId = "doc_" + currentTimeMillis()
-                            val newPage = ScannedPage(
-                                id = "p_" + currentTimeMillis(),
-                                pageNumber = 1,
-                                originalImagePath = filterState.imagePath,
-                                processedImagePath = filterState.imagePath,
-                                cropCorners = filterState.corners,
-                                rotationDegrees = filterState.rotationDegrees,
-                                filterType = filterState.selectedFilter,
-                                brightness = filterState.brightness,
-                                contrast = filterState.contrast,
-                                ocrText = "WHOLE FOODS MARKET\nDate: Oct 25, 2026\nTotal: $37.04",
-                                createdAt = currentTimeMillis()
-                            )
-                            val title = when (filterState.templateType) {
-                                DocumentTemplateType.RECEIPT -> "Whole Foods Receipt"
-                                DocumentTemplateType.LEASE_CONTRACT -> "Lease Contract"
-                                DocumentTemplateType.ID_CARD -> "Driver License ID"
-                                DocumentTemplateType.PASSPORT -> "Passport Scan"
-                                DocumentTemplateType.MEDICAL_PRESCRIPTION -> "Medical Prescription"
-                            }
-                            val newDoc = Document(
-                                id = newDocId,
-                                title = title,
-                                folderId = "f_receipts",
-                                tags = listOf("New Scan", "OCR Ready"),
-                                pages = listOf(newPage),
-                                createdAt = currentTimeMillis(),
-                                updatedAt = currentTimeMillis(),
-                                isFavorite = true
-                            )
                             scope.launch {
+                                val processedPath = if (filterState.imagePath.isNotBlank() && !filterState.imagePath.startsWith("scan_page_")) {
+                                    imageProcessor.applyFilter(
+                                        imagePath = filterState.imagePath,
+                                        filter = filterState.selectedFilter,
+                                        brightness = filterState.brightness,
+                                        contrast = filterState.contrast,
+                                        saturation = filterState.saturation
+                                    )
+                                } else {
+                                    filterState.imagePath
+                                }
+                                val newDocId = "doc_" + currentTimeMillis()
+                                val newPage = ScannedPage(
+                                    id = "p_" + currentTimeMillis(),
+                                    pageNumber = 1,
+                                    originalImagePath = filterState.imagePath,
+                                    processedImagePath = processedPath,
+                                    cropCorners = filterState.corners,
+                                    rotationDegrees = filterState.rotationDegrees,
+                                    filterType = filterState.selectedFilter,
+                                    brightness = filterState.brightness,
+                                    contrast = filterState.contrast,
+                                    ocrText = "WHOLE FOODS MARKET\nDate: Oct 25, 2026\nTotal: $37.04",
+                                    createdAt = currentTimeMillis()
+                                )
+                                val title = when (filterState.templateType) {
+                                    DocumentTemplateType.RECEIPT -> "Whole Foods Receipt"
+                                    DocumentTemplateType.LEASE_CONTRACT -> "Lease Contract"
+                                    DocumentTemplateType.ID_CARD -> "Driver License ID"
+                                    DocumentTemplateType.PASSPORT -> "Passport Scan"
+                                    DocumentTemplateType.MEDICAL_PRESCRIPTION -> "Medical Prescription"
+                                }
+                                val newDoc = Document(
+                                    id = newDocId,
+                                    title = title,
+                                    folderId = "f_receipts",
+                                    tags = listOf("New Scan", "Enhanced"),
+                                    pages = listOf(newPage),
+                                    createdAt = currentTimeMillis(),
+                                    updatedAt = currentTimeMillis(),
+                                    isFavorite = true
+                                )
                                 repository.saveDocument(newDoc)
+                                navController.popBackStack(Screen.Home.route, inclusive = false)
                             }
-                            navController.popBackStack(Screen.Home.route, inclusive = false)
                         }
                     )
                 }

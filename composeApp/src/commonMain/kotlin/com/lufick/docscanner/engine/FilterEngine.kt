@@ -6,6 +6,7 @@ import kotlin.math.min
 
 /**
  * Multiplatform Document Image Enhancement & Color Processing Engine.
+ * Implements Adobe Scan & CamScanner grade color transformation algorithms.
  */
 object FilterEngine {
 
@@ -16,74 +17,122 @@ object FilterEngine {
     }
 
     /**
-     * Generate 4x5 ColorMatrix for GPU / Canvas rendering corresponding to FilterType.
+     * Generate 4x5 ColorMatrix for GPU / Canvas rendering corresponding to FilterType and enhancement parameters.
      */
-    fun getColorMatrixForFilter(filter: FilterType, brightness: Float = 1.0f, contrast: Float = 1.2f): ColorMatrix {
+    fun getColorMatrixForFilter(
+        filter: FilterType,
+        brightness: Float = 1.0f,
+        contrast: Float = 1.2f,
+        saturation: Float = 1.0f
+    ): ColorMatrix {
         val bShift = (brightness - 1.0f) * 255.0f
-        val c = contrast
+
+        // Standard Rec. 709 Luminance coefficients
+        val lr = 0.2126f
+        val lg = 0.7152f
+        val lb = 0.0722f
 
         return when (filter) {
             FilterType.ORIGINAL -> {
+                val s = saturation.coerceAtLeast(0f)
+                val c = contrast
+                val t = 128f * (1f - c) + bShift
+
+                val rSat = lr * (1 - s)
+                val gSat = lg * (1 - s)
+                val bSat = lb * (1 - s)
+
                 ColorMatrix(floatArrayOf(
-                    1f, 0f, 0f, 0f, 0f,
-                    0f, 1f, 0f, 0f, 0f,
-                    0f, 0f, 1f, 0f, 0f,
+                    (rSat + s) * c, gSat * c, bSat * c, 0f, t,
+                    rSat * c, (gSat + s) * c, bSat * c, 0f, t,
+                    rSat * c, gSat * c, (bSat + s) * c, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
             FilterType.MAGIC_COLOR_1 -> {
-                // Signature Lufick Magic Color: Contrast boost, saturation pop, white level lift
-                val sat = 1.35f
-                val rSat = 0.213f * (1 - sat)
-                val gSat = 0.715f * (1 - sat)
-                val bSat = 0.072f * (1 - sat)
+                // Signature Magic Color: High dynamic contrast, vivid ink saturation & pure paper whitening
+                val s = 1.38f * saturation
+                val c = 1.28f * contrast
+                val whiteLift = 34.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rSat = lr * (1 - s)
+                val gSat = lg * (1 - s)
+                val bSat = lb * (1 - s)
 
                 ColorMatrix(floatArrayOf(
-                    (rSat + sat) * c, gSat * c, bSat * c, 0f, bShift + 12f,
-                    rSat * c, (gSat + sat) * c, bSat * c, 0f, bShift + 12f,
-                    rSat * c, gSat * c, (bSat + sat) * c, 0f, bShift + 12f,
+                    (rSat + s) * c, gSat * c, bSat * c, 0f, t,
+                    rSat * c, (gSat + s) * c, bSat * c, 0f, t,
+                    rSat * c, gSat * c, (bSat + s) * c, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
             FilterType.MAGIC_COLOR_2 -> {
-                // Softer color balance for photos & magazine covers
-                val sat = 1.15f
-                val rSat = 0.213f * (1 - sat)
-                val gSat = 0.715f * (1 - sat)
-                val bSat = 0.072f * (1 - sat)
+                // Soft Magic Color: Natural magazine/photographic color balance with mild shadow clearing
+                val s = 1.16f * saturation
+                val c = 1.12f * contrast
+                val whiteLift = 16.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rSat = lr * (1 - s)
+                val gSat = lg * (1 - s)
+                val bSat = lb * (1 - s)
 
                 ColorMatrix(floatArrayOf(
-                    (rSat + sat) * 1.1f, gSat * 1.1f, bSat * 1.1f, 0f, bShift + 6f,
-                    rSat * 1.1f, (gSat + sat) * 1.1f, bSat * 1.1f, 0f, bShift + 6f,
-                    rSat * 1.1f, gSat * 1.1f, (bSat + sat) * 1.1f, 0f, bShift + 6f,
+                    (rSat + s) * c, gSat * c, bSat * c, 0f, t,
+                    rSat * c, (gSat + s) * c, bSat * c, 0f, t,
+                    rSat * c, gSat * c, (bSat + s) * c, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
             FilterType.SHARP_BW -> {
-                // High-contrast clean black & white binarization
-                val bwContrast = max(1.6f, c * 1.5f)
+                // B&W Document: Sharp binarized text contrast with pure #FFFFFF background
+                val c = max(1.85f, contrast * 1.65f)
+                val blackThreshold = -36.0f
+                val t = 128f * (1f - c) + bShift + blackThreshold
+
+                val rBw = 0.299f * c
+                val gBw = 0.587f * c
+                val bBw = 0.114f * c
+
                 ColorMatrix(floatArrayOf(
-                    0.299f * bwContrast, 0.587f * bwContrast, 0.114f * bwContrast, 0f, bShift - 40f,
-                    0.299f * bwContrast, 0.587f * bwContrast, 0.114f * bwContrast, 0f, bShift - 40f,
-                    0.299f * bwContrast, 0.587f * bwContrast, 0.114f * bwContrast, 0f, bShift - 40f,
+                    rBw, gBw, bBw, 0f, t,
+                    rBw, gBw, bBw, 0f, t,
+                    rBw, gBw, bBw, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
             FilterType.GRAYSCALE -> {
-                // Smooth grays with noise suppression
+                // Smooth Grayscale: High-fidelity monochrome with background noise suppression
+                val c = 1.18f * contrast
+                val whiteLift = 22.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rGray = 0.299f * c
+                val gGray = 0.587f * c
+                val bGray = 0.114f * c
+
                 ColorMatrix(floatArrayOf(
-                    0.299f * c, 0.587f * c, 0.114f * c, 0f, bShift + 10f,
-                    0.299f * c, 0.587f * c, 0.114f * c, 0f, bShift + 10f,
-                    0.299f * c, 0.587f * c, 0.114f * c, 0f, bShift + 10f,
+                    rGray, gGray, bGray, 0f, t,
+                    rGray, gGray, bGray, 0f, t,
+                    rGray, gGray, bGray, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
             FilterType.ECO_PRINT -> {
-                // Eco Print ink-saver
+                // Eco Print: Toner/Ink saver mode with elevated white floor
+                val c = 1.05f * contrast
+                val whiteLift = 56.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rEco = 0.25f * c
+                val gEco = 0.50f * c
+                val bEco = 0.10f * c
+
                 ColorMatrix(floatArrayOf(
-                    0.25f * c, 0.5f * c, 0.1f * c, 0f, bShift + 30f,
-                    0.25f * c, 0.5f * c, 0.1f * c, 0f, bShift + 30f,
-                    0.25f * c, 0.5f * c, 0.1f * c, 0f, bShift + 30f,
+                    rEco, gEco, bEco, 0f, t,
+                    rEco, gEco, bEco, 0f, t,
+                    rEco, gEco, bEco, 0f, t,
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
@@ -99,10 +148,11 @@ object FilterEngine {
         height: Int,
         filter: FilterType,
         brightness: Float,
-        contrast: Float
+        contrast: Float,
+        saturation: Float = 1.0f
     ): IntArray {
         val output = IntArray(pixels.size)
-        val matrix = getColorMatrixForFilter(filter, brightness, contrast).values
+        val matrix = getColorMatrixForFilter(filter, brightness, contrast, saturation).values
 
         for (i in pixels.indices) {
             val color = pixels[i]
@@ -122,3 +172,4 @@ object FilterEngine {
 
     private fun clamp(v: Int): Int = min(255, max(0, v))
 }
+

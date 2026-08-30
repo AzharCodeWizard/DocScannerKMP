@@ -10,7 +10,7 @@ class FilterEngineTest {
     @Test
     fun testColorMatrixGeneration() {
         FilterType.entries.forEach { filter ->
-            val matrix = FilterEngine.getColorMatrixForFilter(filter, brightness = 1.0f, contrast = 1.2f)
+            val matrix = FilterEngine.getColorMatrixForFilter(filter, brightness = 1.0f, contrast = 1.2f, saturation = 1.1f)
             assertNotNull(matrix)
             assertEquals(20, matrix.values.size)
         }
@@ -24,8 +24,9 @@ class FilterEngineTest {
             0xFFFF0000.toInt()  // Red
         )
         val processed = FilterEngine.processPixelBuffer(
-            pixels, 3, 1, FilterType.SHARP_BW, 1.0f, 1.5f
+            pixels, 3, 1, FilterType.SHARP_BW, 1.0f, 1.5f, 1.0f
         )
         assertEquals(3, processed.size)
     }
 }
+

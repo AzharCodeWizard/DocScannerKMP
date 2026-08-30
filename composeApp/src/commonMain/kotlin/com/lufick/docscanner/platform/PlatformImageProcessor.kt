@@ -15,8 +15,9 @@ expect class PlatformImageProcessor {
     suspend fun applyFilter(
         imagePath: String,
         filter: FilterType,
-        brightness: Float,
-        contrast: Float
+        brightness: Float = 1.0f,
+        contrast: Float = 1.2f,
+        saturation: Float = 1.0f
     ): String
 
     suspend fun detectDocumentCorners(imagePath: String): QuadCorners

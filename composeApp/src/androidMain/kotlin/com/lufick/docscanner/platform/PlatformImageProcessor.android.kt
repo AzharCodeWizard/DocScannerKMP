@@ -94,7 +94,8 @@ actual class PlatformImageProcessor(private val context: Context) {
         imagePath: String,
         filter: FilterType,
         brightness: Float,
-        contrast: Float
+        contrast: Float,
+        saturation: Float
     ): String = withContext(Dispatchers.IO) {
         val sourceFile = File(imagePath)
         if (!sourceFile.exists()) return@withContext imagePath
@@ -102,7 +103,7 @@ actual class PlatformImageProcessor(private val context: Context) {
         val originalBitmap = BitmapFactory.decodeFile(sourceFile.absolutePath) ?: return@withContext imagePath
         
         val outFile = File(context.filesDir, "filtered_${System.currentTimeMillis()}.jpg")
-        val matrix = FilterEngine.getColorMatrixForFilter(filter, brightness, contrast).values
+        val matrix = FilterEngine.getColorMatrixForFilter(filter, brightness, contrast, saturation).values
         val cm = ColorMatrix(matrix)
         val filterPaint = Paint().apply {
             colorFilter = ColorMatrixColorFilter(cm)
@@ -115,7 +116,7 @@ actual class PlatformImageProcessor(private val context: Context) {
         canvas.drawBitmap(originalBitmap, 0f, 0f, filterPaint)
 
         FileOutputStream(outFile).use { out ->
-            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
         }
         
         originalBitmap.recycle()
