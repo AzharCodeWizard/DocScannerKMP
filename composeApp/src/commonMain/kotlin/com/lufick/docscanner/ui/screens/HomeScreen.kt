@@ -1,6 +1,5 @@
 package com.lufick.docscanner.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,15 +24,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -69,34 +69,37 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToCamera: () -> Unit,
     onNavigateToIdCard: () -> Unit,
+    onNavigateToQrStudio: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDetail: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val documents by viewModel.filteredDocuments.collectAsState()
     val folders by viewModel.folders.collectAsState()
-    val tags by viewModel.tags.collectAsState()
-
+    val filteredDocuments by viewModel.filteredDocuments.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
+    // Create Folder Dialog
     if (uiState.showCreateFolderDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.setShowCreateFolderDialog(false) },
-            title = { Text("Create New Folder", fontWeight = FontWeight.Bold) },
+            title = { Text("Create New Folder") },
             text = {
                 OutlinedTextField(
                     value = newFolderName,
                     onValueChange = { newFolderName = it },
                     label = { Text("Folder Name") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    )
                 )
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.createFolder(newFolderName)
+                    if (newFolderName.isNotBlank()) {
+                        viewModel.createFolder(newFolderName.trim())
+                    }
                     newFolderName = ""
                 }) {
                     Text("Create")
@@ -115,9 +118,20 @@ fun HomeScreen(
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Secondary FAB for ID Card
+                // QR Studio Quick FAB
+                FloatingActionButton(
+                    onClick = onNavigateToQrStudio,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = "QR Studio", modifier = Modifier.size(20.dp))
+                }
+
+                // ID Card 2-in-1 FAB
                 FloatingActionButton(
                     onClick = onNavigateToIdCard,
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -125,7 +139,7 @@ fun HomeScreen(
                     shape = CircleShape,
                     modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Default.CreditCard, contentDescription = "ID Card Scan")
+                    Icon(Icons.Default.CreditCard, contentDescription = "2-in-1 ID Card Scan", modifier = Modifier.size(22.dp))
                 }
 
                 // Main Camera FAB
@@ -174,11 +188,20 @@ fun HomeScreen(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // QR Studio Icon
+                    IconButton(onClick = onNavigateToQrStudio) {
+                        Icon(
+                            Icons.Default.QrCodeScanner,
+                            contentDescription = "QR & Barcode Studio",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     // Sort Order Button
                     Box {
                         IconButton(onClick = { showSortMenu = true }) {
                             Icon(
-                                Icons.Default.Sort,
+                                Icons.AutoMirrored.Filled.Sort,
                                 contentDescription = "Sort Documents",
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -231,59 +254,118 @@ fun HomeScreen(
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.updateSearchQuery(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search docs, receipts, OCR text...", fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                placeholder = { Text("Search documents, OCR text, tags...", fontSize = 14.sp) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Folders Horizontal List
+            // Quick Studio Tools Carousel
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Favorites Pill
                 item {
-                    val isFavSelected = uiState.selectedFolderId == "f_fav"
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isFavSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-                            .border(
-                                1.dp,
-                                if (isFavSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.selectFolder("f_fav") }
-                            .padding(horizontal = 12.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickable(onClick = onNavigateToCamera)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Favorite,
-                            contentDescription = null,
-                            tint = if (isFavSelected) Color.Black else Color(0xFFF43F5E),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Favorites",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isFavSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isFavSelected) Color.Black else MaterialTheme.colorScheme.onSurface
-                        )
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Doc Scan", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }
 
+                item {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = onNavigateToIdCard)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("2-in-1 ID Card", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = onNavigateToQrStudio)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("QR & Barcode", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Folder Tabs & Filter Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Favorites Filter Chip
+                item {
+                    val isFavorites = uiState.selectedFolderId == "f_fav"
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isFavorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                            .border(
+                                width = 1.dp,
+                                color = if (isFavorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { viewModel.selectFolder(if (isFavorites) "f_all" else "f_fav") }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = "Favorites",
+                                tint = if (isFavorites) Color.Black else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Favorites",
+                                fontSize = 12.sp,
+                                fontWeight = if (isFavorites) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isFavorites) Color.Black else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                // Dynamic Folders
                 items(folders) { folder ->
                     val isSelected = uiState.selectedFolderId == folder.id
                     Box(
@@ -291,19 +373,28 @@ fun HomeScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                             .border(
-                                1.dp,
-                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                RoundedCornerShape(12.dp)
+                                width = 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp)
                             )
                             .clickable { viewModel.selectFolder(folder.id) }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        Text(
-                            text = folder.name,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = folder.name,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
 
@@ -313,60 +404,88 @@ fun HomeScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                RoundedCornerShape(12.dp)
-                            )
                             .clickable { viewModel.setShowCreateFolderDialog(true) }
-                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Add Folder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Folder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = "New Folder",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Documents Grid / List
-            if (documents.isEmpty()) {
+            // Document Count / Status Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${filteredDocuments.size} Documents",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = uiState.sortOrder.title,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Documents List or Grid
+            if (filteredDocuments.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Icon(
-                            Icons.Default.Folder,
+                            Icons.Default.Search,
                             contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(48.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "No documents found",
+                            text = "No documents found",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "Tap the camera button to scan your first document",
+                            text = "Tap the camera button to scan your first page",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
-                    contentPadding = PaddingValues(bottom = 90.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    columns = GridCells.Fixed(if (uiState.isGridView) 2 else 1),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 100.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(documents, key = { it.id }) { doc ->
+                    items(filteredDocuments, key = { it.id }) { doc ->
                         DocCard(
                             document = doc,
                             isGridView = uiState.isGridView,

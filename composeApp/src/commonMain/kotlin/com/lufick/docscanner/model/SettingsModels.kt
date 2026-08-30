@@ -64,5 +64,10 @@ data class SettingsUiState(
     val defaultWatermarkText: String = "DocScanner Confidential",
     val isWatermarkEnabledByDefault: Boolean = false,
     val ocrLanguage: String = "English (Latin)",
-    val storageUsedMb: Float = 14.8f
+    val storageUsedMb: Float = 14.8f,
+    val isAppLockEnabled: Boolean = false,
+    val pinCode: String = "1234",
+    val isBiometricEnabled: Boolean = true,
+    val isAppUnlocked: Boolean = false,
+    val backupExportJson: String? = null
 )
