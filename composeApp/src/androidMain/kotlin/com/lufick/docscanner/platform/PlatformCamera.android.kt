@@ -335,12 +335,14 @@ private fun analyzeDocumentEdges(imageProxy: androidx.camera.core.ImageProxy): Q
         sumDiff += rowGrad
     }
 
-    if (sumDiff > 3000) {
-        val delta = ((maxHGrad % 10) - 5) * 0.003f
-        edgeMinX = (defaultMinX - delta).coerceIn(0.05f, 0.14f)
-        edgeMaxX = (defaultMaxX + delta).coerceIn(0.86f, 0.95f)
-        edgeMinY = (defaultMinY - delta).coerceIn(0.10f, 0.16f)
-        edgeMaxY = (defaultMaxY + delta).coerceIn(0.58f, 0.65f)
+    if (sumDiff > 3500) {
+        val contrastFactor = (sumDiff / 80000f).coerceIn(0.0f, 1.0f)
+        val insetX = 0.03f * contrastFactor
+        val insetY = 0.04f * contrastFactor
+        edgeMinX = (defaultMinX + insetX).coerceIn(0.06f, 0.12f)
+        edgeMaxX = (defaultMaxX - insetX).coerceIn(0.88f, 0.94f)
+        edgeMinY = (defaultMinY + insetY).coerceIn(0.11f, 0.15f)
+        edgeMaxY = (defaultMaxY - insetY).coerceIn(0.59f, 0.63f)
     }
 
     return QuadCorners(

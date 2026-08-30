@@ -44,8 +44,8 @@ fun DocumentQuadOverlay(
 
     // Continuous Laser Sweep Animation
     val laserProgress by infiniteTransition.animateFloat(
-        initialValue = 0.08f,
-        targetValue = 0.92f,
+        initialValue = 0.05f,
+        targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
             animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -54,32 +54,40 @@ fun DocumentQuadOverlay(
 
     // Dynamic Corner Pulse & Seeking Motion
     val cornerPulse by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+        initialValue = 0.92f,
+        targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         )
     )
 
-    val breathingWave by infiniteTransition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        )
+    // Adobe Scan Style: Spring-damped smooth corner transitions (eliminates all camera jitter)
+    val animSpec = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
     )
+
+    val tlX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topLeft.x, animationSpec = animSpec)
+    val tlY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topLeft.y, animationSpec = animSpec)
+
+    val trX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topRight.x, animationSpec = animSpec)
+    val trY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topRight.y, animationSpec = animSpec)
+
+    val brX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomRight.x, animationSpec = animSpec)
+    val brY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomRight.y, animationSpec = animSpec)
+
+    val blX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomLeft.x, animationSpec = animSpec)
+    val blY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomLeft.y, animationSpec = animSpec)
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
 
-        // Apply dynamic subtle tracking movement to corners
-        val tl = Offset(quad.topLeft.x * w + breathingWave, quad.topLeft.y * h - breathingWave)
-        val tr = Offset(quad.topRight.x * w - breathingWave, quad.topRight.y * h + breathingWave)
-        val br = Offset(quad.bottomRight.x * w + breathingWave, quad.bottomRight.y * h + breathingWave)
-        val bl = Offset(quad.bottomLeft.x * w - breathingWave, quad.bottomLeft.y * h - breathingWave)
+        val tl = Offset(tlX * w, tlY * h)
+        val tr = Offset(trX * w, trY * h)
+        val br = Offset(brX * w, brY * h)
+        val bl = Offset(blX * w, blY * h)
 
         val quadPath = Path().apply {
             moveTo(tl.x, tl.y)
@@ -89,25 +97,25 @@ fun DocumentQuadOverlay(
             close()
         }
 
-        // Semi-transparent surface tint
+        // Semi-transparent document tint
         drawPath(
             path = quadPath,
-            color = LufickEmerald.copy(alpha = if (isDetected) 0.12f else 0.04f)
+            color = LufickEmerald.copy(alpha = if (isDetected) 0.14f else 0.05f)
         )
 
-        // Glowing Boundary Line
+        // Smooth Glowing Boundary Line
         drawPath(
             path = quadPath,
-            color = LufickEmerald.copy(alpha = 0.85f),
+            color = LufickEmerald.copy(alpha = 0.90f),
             style = Stroke(
                 width = 2.5.dp.toPx(),
                 pathEffect = if (isDetected) null else PathEffect.dashPathEffect(floatArrayOf(20f, 15f))
             )
         )
 
-        // 4 Dynamic L-Bracket Corner Targeting Reticles
-        val bracketLen = (28.dp.toPx() * cornerPulse).coerceIn(24.dp.toPx(), 36.dp.toPx())
-        val bracketStroke = 4.5.dp.toPx()
+        // 4 Adobe Scan style Corner L-Brackets with fluid pulse
+        val bracketLen = 28.dp.toPx() * cornerPulse
+        val bracketStroke = 4.dp.toPx()
         val cornerColor = if (isDetected) LufickEmerald else LufickCyan
 
         // Top-Left L
@@ -126,9 +134,10 @@ fun DocumentQuadOverlay(
         drawLine(cornerColor, bl, Offset(bl.x + bracketLen, bl.y), strokeWidth = bracketStroke, cap = StrokeCap.Round)
         drawLine(cornerColor, bl, Offset(bl.x, bl.y - bracketLen), strokeWidth = bracketStroke, cap = StrokeCap.Round)
 
-        // 4 Glowing Center Dots at Corners
+        // 4 Circular Anchor Pins at Corners
         listOf(tl, tr, br, bl).forEach { pt ->
-            drawCircle(color = Color.White, radius = 3.5.dp.toPx(), center = pt)
+            drawCircle(color = LufickEmerald, radius = 5.dp.toPx(), center = pt)
+            drawCircle(color = Color.White, radius = 2.5.dp.toPx(), center = pt)
         }
 
         // Sweeping Laser Beam
@@ -141,15 +150,15 @@ fun DocumentQuadOverlay(
                 brush = Brush.horizontalGradient(
                     listOf(
                         Color.Transparent,
-                        LaserScanColor.copy(alpha = 0.8f),
+                        LaserScanColor.copy(alpha = 0.85f),
                         Color.White,
-                        LaserScanColor.copy(alpha = 0.8f),
+                        LaserScanColor.copy(alpha = 0.85f),
                         Color.Transparent
                     )
                 ),
                 start = Offset(laserStartX, currentLaserY),
                 end = Offset(laserEndX, currentLaserY),
-                strokeWidth = 3.5.dp.toPx(),
+                strokeWidth = 3.dp.toPx(),
                 cap = StrokeCap.Round
             )
         }

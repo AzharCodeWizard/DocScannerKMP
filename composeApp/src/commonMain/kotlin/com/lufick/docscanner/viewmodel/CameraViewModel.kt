@@ -105,9 +105,30 @@ class CameraViewModel : ViewModel() {
     }
 
     fun onEdgeDetected(quad: QuadCorners) {
-        // Smooth lerp update
         val curr = _uiState.value.detectedQuad
-        val lerpFactor = 0.35f
+        
+        // Calculate total movement across 4 corners to eliminate sensor jitter noise
+        val moveTl = kotlin.math.hypot((quad.topLeft.x - curr.topLeft.x).toDouble(), (quad.topLeft.y - curr.topLeft.y).toDouble()).toFloat()
+        val moveTr = kotlin.math.hypot((quad.topRight.x - curr.topRight.x).toDouble(), (quad.topRight.y - curr.topRight.y).toDouble()).toFloat()
+        val moveBr = kotlin.math.hypot((quad.bottomRight.x - curr.bottomRight.x).toDouble(), (quad.bottomRight.y - curr.bottomRight.y).toDouble()).toFloat()
+        val moveBl = kotlin.math.hypot((quad.bottomLeft.x - curr.bottomLeft.x).toDouble(), (quad.bottomLeft.y - curr.bottomLeft.y).toDouble()).toFloat()
+        val maxPointMovement = maxOf(moveTl, moveTr, moveBr, moveBl)
+
+        // Deadband filter: ignore micro-jitter below 0.012 (prevents overlay shaking)
+        if (maxPointMovement < 0.012f) {
+            if (_uiState.value.detectionState != DetectionState.HOLD_STILL) {
+                _uiState.value = _uiState.value.copy(detectionState = DetectionState.HOLD_STILL)
+            }
+            if (_uiState.value.isAutoCaptureOn && _uiState.value.scanMode == ScanMode.DOCUMENT) {
+                if (autoCaptureJob == null || !autoCaptureJob!!.isActive) {
+                    startAutoCaptureTimer()
+                }
+            }
+            return
+        }
+
+        // Dynamic Lerp Factor: smooth gliding for small moves, responsive tracking for large pans
+        val lerpFactor = if (maxPointMovement > 0.12f) 0.35f else 0.20f
         val smoothed = QuadCorners(
             topLeft = PointF(
                 curr.topLeft.x + (quad.topLeft.x - curr.topLeft.x) * lerpFactor,
@@ -127,9 +148,7 @@ class CameraViewModel : ViewModel() {
             )
         )
 
-        val isStable = kotlin.math.abs(curr.topLeft.x - quad.topLeft.x) < 0.05f &&
-                       kotlin.math.abs(curr.topLeft.y - quad.topLeft.y) < 0.05f
-
+        val isStable = maxPointMovement < 0.04f
         val newDetectionState = if (isStable) DetectionState.HOLD_STILL else DetectionState.DETECTED
 
         _uiState.value = _uiState.value.copy(
