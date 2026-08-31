@@ -50,6 +50,7 @@ private const val TAG = "DocScannerCamera"
 actual fun CameraPreview(
     modifier: Modifier,
     flashEnabled: Boolean,
+    zoomRatio: Float,
     isQrScanMode: Boolean,
     onEdgeDetected: (QuadCorners) -> Unit,
     onQrDetected: (payload: String, qrBoundingRatio: Float) -> Unit,
@@ -174,6 +175,10 @@ actual fun CameraPreview(
                         )
                         cameraInstance = camera
                         camera.cameraControl.enableTorch(flashEnabled)
+                        val zoomState = camera.cameraInfo.zoomState.value
+                        val minZ = zoomState?.minZoomRatio ?: 1.0f
+                        val maxZ = zoomState?.maxZoomRatio ?: 5.0f
+                        camera.cameraControl.setZoomRatio(zoomRatio.coerceIn(minZ, maxZ))
                         
                         onCameraBind(AndroidPlatformCameraHandler(context, imageCapture, camera))
                     } catch (exc: Exception) {
@@ -186,8 +191,14 @@ actual fun CameraPreview(
             update = {
                 try {
                     cameraInstance?.cameraControl?.enableTorch(flashEnabled)
+                    cameraInstance?.let { cam ->
+                        val zoomState = cam.cameraInfo.zoomState.value
+                        val minZ = zoomState?.minZoomRatio ?: 1.0f
+                        val maxZ = zoomState?.maxZoomRatio ?: 5.0f
+                        cam.cameraControl.setZoomRatio(zoomRatio.coerceIn(minZ, maxZ))
+                    }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Torch update error", e)
+                    Log.e(TAG, "Camera control update error", e)
                 }
             }
         )
@@ -278,11 +289,25 @@ class AndroidPlatformCameraHandler(
     }
 
     override fun setZoom(ratio: Float) {
-        camera?.cameraControl?.setZoomRatio(ratio)
+        camera?.let { cam ->
+            try {
+                val zoomState = cam.cameraInfo.zoomState.value
+                val minZ = zoomState?.minZoomRatio ?: 1.0f
+                val maxZ = zoomState?.maxZoomRatio ?: 5.0f
+                val safeRatio = ratio.coerceIn(minZ, maxZ)
+                cam.cameraControl.setZoomRatio(safeRatio)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set camera zoom ratio: $ratio", e)
+            }
+        }
     }
 
     override fun resetZoom() {
-        camera?.cameraControl?.setZoomRatio(1.0f)
+        camera?.let { cam ->
+            try {
+                cam.cameraControl.setZoomRatio(1.0f)
+            } catch (_: Exception) {}
+        }
     }
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,6 +82,11 @@ fun CameraScreen(
 
     var isCapturing by remember { mutableStateOf(false) }
 
+    // Dynamic Hardware Zoom Synchronization
+    LaunchedEffect(uiState.zoomRatio, cameraHandler) {
+        cameraHandler?.setZoom(uiState.zoomRatio)
+    }
+
     // Auto-Capture Shutter Trigger (with single-shot guard)
     LaunchedEffect(uiState.autoCaptureProgress) {
         if (uiState.autoCaptureProgress >= 1.0f && uiState.isAutoCaptureOn && !isCapturing) {
@@ -95,11 +101,18 @@ fun CameraScreen(
         }
     }
 
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTransformGestures { _, _, zoom, _ ->
+                    val currentZoom = viewModel.uiState.value.zoomRatio
+                    val newZoom = (currentZoom * zoom).coerceIn(1.0f, 5.0f)
+                    val rounded = (kotlin.math.round(newZoom * 10f) / 10f)
+                    viewModel.setZoom(rounded)
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     viewModel.onScreenTapped(offset)
@@ -107,14 +120,17 @@ fun CameraScreen(
             }
     ) {
         
-        
         // 1. Live Camera Preview
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
             flashEnabled = uiState.flashMode == FlashMode.ON || uiState.flashMode == FlashMode.TORCH,
+            zoomRatio = uiState.zoomRatio,
             isQrScanMode = (uiState.scanMode == ScanMode.QR_CODE),
             onEdgeDetected = { viewModel.onEdgeDetected(it) },
-            onCameraBind = { handler -> cameraHandler = handler }
+            onCameraBind = { handler -> 
+                cameraHandler = handler
+                handler.setZoom(uiState.zoomRatio)
+            }
         )
 
         // 2. Mode-Specific Overlays
@@ -317,17 +333,37 @@ fun CameraScreen(
                     )
                 }
 
-                // Zoom Selector (.5x, 1x, 2x)
+                // Zoom Selector (1x, 2x, 3x + Custom Pinch)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color.Black.copy(alpha = 0.75f))
                         .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 4.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf(0.5f, 1.0f, 2.0f).forEach { zoom ->
-                        val isSel = uiState.zoomRatio == zoom
+                    val presets = listOf(1.0f, 2.0f, 3.0f)
+                    val isCustom = presets.none { kotlin.math.abs(it - uiState.zoomRatio) < 0.08f }
+
+                    if (isCustom) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LufickEmerald)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "${uiState.zoomRatio}x",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+
+                    presets.forEach { zoom ->
+                        val isSel = !isCustom && kotlin.math.abs(uiState.zoomRatio - zoom) < 0.08f
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
@@ -336,7 +372,7 @@ fun CameraScreen(
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = "${if (zoom == 0.5f) ".5" else zoom.toInt()}x",
+                                text = "${zoom.toInt()}x",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isSel) Color.Black else Color.White

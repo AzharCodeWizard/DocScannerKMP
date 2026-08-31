@@ -13,6 +13,7 @@ import com.lufick.docscanner.model.QuadCorners
 actual fun CameraPreview(
     modifier: Modifier,
     flashEnabled: Boolean,
+    zoomRatio: Float,
     isQrScanMode: Boolean,
     onEdgeDetected: (QuadCorners) -> Unit,
     onQrDetected: (payload: String, qrBoundingRatio: Float) -> Unit,
