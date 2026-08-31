@@ -119,6 +119,42 @@ object FilterEngine {
                     0f, 0f, 0f, 1f, 0f
                 ))
             }
+            FilterType.SUPER_CLEAN -> {
+                // Super Clean: Shadow & yellow stain suppression with bright white background
+                val s = 1.15f * saturation
+                val c = 1.35f * contrast
+                val whiteLift = 44.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rSat = lr * (1 - s)
+                val gSat = lg * (1 - s)
+                val bSat = lb * (1 - s)
+
+                ColorMatrix(floatArrayOf(
+                    (rSat + s) * c, gSat * c, bSat * c, 0f, t,
+                    rSat * c, (gSat + s) * c, bSat * c, 0f, t,
+                    rSat * c, gSat * c, (bSat + s) * c, 0f, t,
+                    0f, 0f, 0f, 1f, 0f
+                ))
+            }
+            FilterType.VIVID_PHOTO -> {
+                // Vivid Photo: Rich saturation & enhanced color dynamic range for graphics/photos
+                val s = 1.55f * saturation
+                val c = 1.22f * contrast
+                val whiteLift = 10.0f
+                val t = 128f * (1f - c) + bShift + whiteLift
+
+                val rSat = lr * (1 - s)
+                val gSat = lg * (1 - s)
+                val bSat = lb * (1 - s)
+
+                ColorMatrix(floatArrayOf(
+                    (rSat + s) * c, gSat * c, bSat * c, 0f, t,
+                    rSat * c, (gSat + s) * c, bSat * c, 0f, t,
+                    rSat * c, gSat * c, (bSat + s) * c, 0f, t,
+                    0f, 0f, 0f, 1f, 0f
+                ))
+            }
             FilterType.ECO_PRINT -> {
                 // Eco Print: Toner/Ink saver mode with elevated white floor
                 val c = 1.05f * contrast

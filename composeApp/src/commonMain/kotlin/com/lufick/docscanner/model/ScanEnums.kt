@@ -13,12 +13,14 @@ enum class ScanMode(val title: String, val description: String) {
 
 @Serializable
 enum class FilterType(val displayName: String, val description: String) {
-    ORIGINAL("Original", "Unprocessed camera photo"),
-    MAGIC_COLOR_1("Magic Color", "Vibrant colors with pure white paper background"),
-    MAGIC_COLOR_2("Magic Color 2", "Enhanced soft color balance for photos/magazines"),
-    SHARP_BW("Sharp B&W", "High contrast black and white for crisp text"),
-    GRAYSCALE("Grayscale", "Smooth gray tones with background noise removal"),
-    ECO_PRINT("Eco Print", "Ink saver mode with minimal dark coverage")
+    ORIGINAL("Original", "Raw unprocessed capture"),
+    MAGIC_COLOR_1("Magic Color", "Vivid contrast with paper whitening"),
+    MAGIC_COLOR_2("Magic Pro", "Natural tone with shadow clearing"),
+    SUPER_CLEAN("Super Clean", "Removes shadows & yellow paper tint"),
+    SHARP_BW("Sharp B&W", "High contrast black and white text"),
+    GRAYSCALE("Grayscale", "Smooth monochrome with noise removal"),
+    VIVID_PHOTO("Vivid Color", "Rich saturation for color graphics"),
+    ECO_PRINT("Eco Print", "Ink & toner saver mode")
 }
 
 @Serializable

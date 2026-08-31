@@ -7,9 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class FilterTab {
-    PRESETS,
-    ADJUST
+enum class FilterTab(val title: String) {
+    PRESETS("Filters"),
+    ADJUST("Adjust"),
+    TOOLS("Tools")
 }
 
 data class FilterUiState(
@@ -62,6 +63,18 @@ class FilterViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(saturation = value)
     }
 
+    fun resetBrightness() {
+        _uiState.value = _uiState.value.copy(brightness = 1.0f)
+    }
+
+    fun resetContrast() {
+        _uiState.value = _uiState.value.copy(contrast = 1.25f)
+    }
+
+    fun resetSaturation() {
+        _uiState.value = _uiState.value.copy(saturation = 1.0f)
+    }
+
     fun setActiveTab(tab: FilterTab) {
         _uiState.value = _uiState.value.copy(activeTab = tab)
     }
@@ -71,20 +84,27 @@ class FilterViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(rotationDegrees = next)
     }
 
+    fun rotateCounterClockwise() {
+        val next = (_uiState.value.rotationDegrees + 270) % 360
+        _uiState.value = _uiState.value.copy(rotationDegrees = next)
+    }
+
     fun autoEnhance() {
         _uiState.value = _uiState.value.copy(
             selectedFilter = FilterType.MAGIC_COLOR_1,
-            brightness = 1.04f,
-            contrast = 1.30f,
-            saturation = 1.15f
+            brightness = 1.05f,
+            contrast = 1.35f,
+            saturation = 1.18f
         )
     }
 
-    fun resetAdjustments() {
+    fun resetAll() {
         _uiState.value = _uiState.value.copy(
+            selectedFilter = FilterType.ORIGINAL,
             brightness = 1.0f,
             contrast = 1.20f,
-            saturation = 1.0f
+            saturation = 1.0f,
+            rotationDegrees = 0
         )
     }
 
