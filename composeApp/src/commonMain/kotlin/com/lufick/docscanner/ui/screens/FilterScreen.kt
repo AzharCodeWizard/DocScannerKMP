@@ -405,6 +405,8 @@ fun FilterScreen(
                             items(FilterType.entries) { filter ->
                                 val isSelected = uiState.selectedFilter == filter
                                 VisualFilterCard(
+                                    imagePath = uiState.imagePath,
+                                    rotationDegrees = uiState.rotationDegrees,
                                     filter = filter,
                                     isSelected = isSelected,
                                     onClick = { viewModel.selectFilter(filter) }
@@ -500,17 +502,23 @@ fun FilterScreen(
 }
 
 /**
- * High-End Visual Filter Preset Card with Styled Miniature Preview
+ * High-End Visual Filter Preset Card with Real Processed Image Preview
  */
 @Composable
 private fun VisualFilterCard(
+    imagePath: String,
+    rotationDegrees: Int = 0,
     filter: FilterType,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val filterColorMatrix = remember(filter) {
+        ColorFilter.colorMatrix(ColorMatrix(FilterEngine.getColorMatrixForFilter(filter).values))
+    }
+
     Card(
         modifier = Modifier
-            .width(86.dp)
+            .width(88.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -528,24 +536,28 @@ private fun VisualFilterCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Miniature Document Preview Thumbnail
+            // Real Image Miniature Document Preview Thumbnail with applied filter
             Box(
                 modifier = Modifier
-                    .size(46.dp, 56.dp)
+                    .size(54.dp, 68.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(getFilterPreviewBrush(filter))
-                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                    .background(Color(0xFF0F172A))
+                    .border(1.dp, if (isSelected) LufickEmerald.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                // Miniature Document Text Lines
-                Column(
-                    modifier = Modifier.padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Box(modifier = Modifier.size(24.dp, 3.dp).background(getFilterLineColor(filter)))
-                    Box(modifier = Modifier.size(32.dp, 3.dp).background(getFilterLineColor(filter)))
-                    Box(modifier = Modifier.size(20.dp, 3.dp).background(getFilterLineColor(filter)))
-                    Box(modifier = Modifier.size(28.dp, 3.dp).background(getFilterLineColor(filter)))
+                if (imagePath.isNotBlank()) {
+                    LocalImage(
+                        path = imagePath,
+                        modifier = Modifier.fillMaxSize().padding(2.dp),
+                        colorFilter = filterColorMatrix,
+                        rotationDegrees = rotationDegrees
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(getFilterPreviewBrush(filter))
+                    )
                 }
 
                 // Selected Checkmark Badge
@@ -553,7 +565,7 @@ private fun VisualFilterCard(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(2.dp)
+                            .padding(3.dp)
                             .size(16.dp)
                             .clip(CircleShape)
                             .background(LufickEmerald),
