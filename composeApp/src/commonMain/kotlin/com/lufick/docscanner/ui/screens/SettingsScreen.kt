@@ -24,10 +24,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
@@ -74,6 +77,10 @@ import com.lufick.docscanner.model.PageSize
 import com.lufick.docscanner.model.PdfQuality
 import com.lufick.docscanner.platform.rememberPlatformShare
 import com.lufick.docscanner.ui.components.LufickTopBar
+import com.lufick.docscanner.ui.legal.LegalConstants
+import com.lufick.docscanner.ui.legal.OpenSourceLicensesDialog
+import com.lufick.docscanner.ui.legal.PrivacyPolicyDialog
+import com.lufick.docscanner.ui.legal.TermsOfServiceDialog
 import com.lufick.docscanner.viewmodel.SettingsViewModel
 
 @Composable
@@ -88,6 +95,21 @@ fun SettingsScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var newPinInput by remember { mutableStateOf("") }
     var backupNotice by remember { mutableStateOf<String?>(null) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
+
+    if (showLicensesDialog) {
+        OpenSourceLicensesDialog(onDismiss = { showLicensesDialog = false })
+    }
+
+    if (showPrivacyDialog) {
+        PrivacyPolicyDialog(onDismiss = { showPrivacyDialog = false })
+    }
+
+    if (showTermsDialog) {
+        TermsOfServiceDialog(onDismiss = { showTermsDialog = false })
+    }
 
     if (showPinDialog) {
         AlertDialog(
@@ -715,9 +737,9 @@ fun SettingsScreen(
                 }
             }
 
-            // 7. About DocScanner Card
+            // 7. About & Legal Information Card
             item {
-                SettingsSectionHeader(title = "About DocScanner", icon = Icons.Default.Info)
+                SettingsSectionHeader(title = "About & Legal", icon = Icons.Default.Info)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Card(
@@ -727,35 +749,158 @@ fun SettingsScreen(
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
+                        // App Identity Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    "DocScanner KMP",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "Version ${LegalConstants.APP_VERSION} • Build ${LegalConstants.BUILD_CODE}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
                         Text(
-                            "DocScanner KMP",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            "Version 2.5.0 • Complete Parity Edition",
+                            "100% On-Device AI Document Scanner & PDF Suite with Hardware Perspective Dewarp, GPU Filters & AES Security.",
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Comprehensive document scanner & PDF suite powered by Compose Multiplatform, CameraX, and Hardware Perspective Engine.",
-                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                        // Legal and Support Action Rows
+                        LegalActionRow(
+                            title = "Open Source Licenses",
+                            subtitle = "Third-party libraries & license notices (${LegalConstants.OPEN_SOURCE_LICENSES.size} dependencies)",
+                            icon = Icons.Default.Code,
+                            onClick = { showLicensesDialog = true }
+                        )
+
+                        LegalActionRow(
+                            title = "Privacy Policy",
+                            subtitle = "100% on-device guarantee & zero cloud uploads",
+                            icon = Icons.Default.Security,
+                            onClick = { showPrivacyDialog = true }
+                        )
+
+                        LegalActionRow(
+                            title = "Terms of Service",
+                            subtitle = "Terms of usage, cryptographic security & ownership",
+                            icon = Icons.Default.Gavel,
+                            onClick = { showTermsDialog = true }
+                        )
+
+                        LegalActionRow(
+                            title = "Contact Support & Feedback",
+                            subtitle = "${LegalConstants.SUPPORT_EMAIL} • Send diagnostics",
+                            icon = Icons.Default.Email,
+                            onClick = {
+                                val diagnosticText = """
+                                --- DocScanner Support & Feedback ---
+                                To: ${LegalConstants.SUPPORT_EMAIL}
+                                App: DocScanner KMP
+                                Version: ${LegalConstants.APP_VERSION} (Build ${LegalConstants.BUILD_CODE})
+                                Platform: Kotlin Multiplatform / Compose Multiplatform
+                                --------------------------------------
+                                Please describe your issue, feedback, or suggestion below:
+                                
+                                """.trimIndent()
+                                platformShare.shareText(diagnosticText)
+                            }
+                        )
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
                         Text(
-                            "© 2026 Lufick Technologies. All rights reserved.",
+                            text = LegalConstants.COPYRIGHT_NOTICE,
                             fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LegalActionRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -60,6 +60,8 @@ kotlin {
             implementation(libs.androidx.camera.view)
             implementation(libs.google.mlkit.text.recognition)
             implementation(libs.google.mlkit.barcode.scanning)
+            implementation(libs.firebase.analytics)
+            implementation(libs.firebase.crashlytics)
             implementation(libs.koin.android)
         }
 
