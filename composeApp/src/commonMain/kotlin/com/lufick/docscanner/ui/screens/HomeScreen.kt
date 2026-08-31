@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lufick.docscanner.platform.rememberPlatformImagePicker
 import com.lufick.docscanner.ui.components.DocCard
 import com.lufick.docscanner.viewmodel.DocSortOrder
 import com.lufick.docscanner.viewmodel.HomeViewModel
@@ -71,11 +73,13 @@ fun HomeScreen(
     onNavigateToIdCard: () -> Unit,
     onNavigateToQrStudio: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onImportImage: (String) -> Unit = {},
     onNavigateToDetail: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val folders by viewModel.folders.collectAsState()
     val filteredDocuments by viewModel.filteredDocuments.collectAsState()
+    val imagePicker = rememberPlatformImagePicker()
     var showSortMenu by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
@@ -129,6 +133,21 @@ fun HomeScreen(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(Icons.Default.QrCodeScanner, contentDescription = "QR Studio", modifier = Modifier.size(20.dp))
+                }
+
+                // Import from Gallery FAB
+                FloatingActionButton(
+                    onClick = {
+                        imagePicker.launchImagePicker { pickedPath ->
+                            onImportImage(pickedPath)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = "Import from Photos", modifier = Modifier.size(20.dp))
                 }
 
                 // ID Card 2-in-1 FAB
@@ -321,6 +340,25 @@ fun HomeScreen(
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("QR & Barcode", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = {
+                                imagePicker.launchImagePicker { pickedPath ->
+                                    onImportImage(pickedPath)
+                                }
+                            })
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Import Photos", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }

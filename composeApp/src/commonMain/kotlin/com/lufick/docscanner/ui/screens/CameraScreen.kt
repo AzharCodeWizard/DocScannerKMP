@@ -68,6 +68,7 @@ import com.lufick.docscanner.ui.components.QrScannerOverlay
 import com.lufick.docscanner.ui.components.RuleOfThirdsGrid
 import com.lufick.docscanner.ui.components.ShutterButton
 import com.lufick.docscanner.ui.components.TapToFocusRing
+import com.lufick.docscanner.platform.rememberPlatformImagePicker
 import com.lufick.docscanner.viewmodel.CameraViewModel
 import com.lufick.docscanner.viewmodel.FlashMode
 
@@ -78,6 +79,7 @@ fun CameraScreen(
     onNavigateToCrop: (capturedPath: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val imagePicker = rememberPlatformImagePicker()
     var cameraHandler by remember { mutableStateOf<PlatformCameraHandler?>(null) }
 
     var isCapturing by remember { mutableStateOf(false) }
@@ -435,17 +437,12 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gallery / Recent Batch Import Button
+                // Gallery Import Button
                 IconButton(
                     onClick = {
-                        val lastImg = uiState.capturedImages.lastOrNull()
-                        if (lastImg != null) {
-                            onNavigateToCrop(lastImg)
-                        } else {
-                            cameraHandler?.capturePhoto { capturedPath ->
-                                viewModel.onPhotoCaptured(capturedPath)
-                                onNavigateToCrop(capturedPath)
-                            }
+                        imagePicker.launchImagePicker { importedPath ->
+                            viewModel.onPhotoCaptured(importedPath)
+                            onNavigateToCrop(importedPath)
                         }
                     },
                     modifier = Modifier

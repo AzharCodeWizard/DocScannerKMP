@@ -78,6 +78,10 @@ fun DocScannerApp() {
                         onNavigateToIdCard = { navController.navigate(Screen.IdCard.route) },
                         onNavigateToQrStudio = { navController.navigate(Screen.QrStudio.route) },
                         onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                        onImportImage = { importedPath ->
+                            cropViewModel.setImage(importedPath)
+                            navController.navigate(Screen.Crop.route)
+                        },
                         onNavigateToDetail = { docId ->
                             navController.navigate(Screen.DocumentDetail.createRoute(docId))
                         }
