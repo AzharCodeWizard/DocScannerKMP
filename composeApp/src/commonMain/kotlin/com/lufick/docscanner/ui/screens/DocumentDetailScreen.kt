@@ -211,23 +211,43 @@ fun DocumentDetailScreen(
                     ) {
                         itemsIndexed(doc.pages) { idx, page ->
                             val isSelected = uiState.selectedPageIndex == idx
+                            val pageImg = page.processedImagePath.ifBlank { page.originalImagePath }
                             Box(
                                 modifier = Modifier
                                     .size(68.dp, 90.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color.White)
+                                    .background(Color(0xFF0F172A))
                                     .border(
                                         2.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                         RoundedCornerShape(12.dp)
                                     )
-                                    .clickable { viewModel.selectPage(idx) }
-                                    .padding(6.dp),
+                                    .clickable { viewModel.selectPage(idx) },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("P${idx + 1}", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
-                                    Text(page.filterType.displayName.take(5), fontSize = 8.sp, color = Color.Gray)
+                                if (pageImg.isNotBlank()) {
+                                    LocalImage(
+                                        path = pageImg,
+                                        modifier = Modifier.fillMaxSize(),
+                                        rotationDegrees = page.rotationDegrees
+                                    )
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("P${idx + 1}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                        Text(page.filterType.displayName.take(5), fontSize = 8.sp, color = Color.LightGray)
+                                    }
+                                }
+
+                                // Small page badge at bottom right
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.Black.copy(alpha = 0.75f))
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text("P${idx + 1}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
