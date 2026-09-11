@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,9 +35,9 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.lufick.docscanner.model.ScanMode
 import com.lufick.docscanner.platform.CameraPreview
 import com.lufick.docscanner.platform.PlatformCameraHandler
+import com.lufick.docscanner.platform.rememberPlatformImagePicker
 import com.lufick.docscanner.theme.LufickEmerald
 import com.lufick.docscanner.ui.components.BatchThumbnailReel
 import com.lufick.docscanner.ui.components.BookGuideOverlay
@@ -68,8 +70,8 @@ import com.lufick.docscanner.ui.components.QrScannerOverlay
 import com.lufick.docscanner.ui.components.RuleOfThirdsGrid
 import com.lufick.docscanner.ui.components.ShutterButton
 import com.lufick.docscanner.ui.components.TapToFocusRing
-import com.lufick.docscanner.platform.rememberPlatformImagePicker
 import com.lufick.docscanner.viewmodel.CameraViewModel
+import com.lufick.docscanner.viewmodel.DetectionState
 import com.lufick.docscanner.viewmodel.FlashMode
 
 @Composable
@@ -81,7 +83,6 @@ fun CameraScreen(
     val uiState by viewModel.uiState.collectAsState()
     val imagePicker = rememberPlatformImagePicker()
     var cameraHandler by remember { mutableStateOf<PlatformCameraHandler?>(null) }
-
     var isCapturing by remember { mutableStateOf(false) }
 
     // Dynamic Hardware Zoom Synchronization
@@ -121,26 +122,26 @@ fun CameraScreen(
                 }
             }
     ) {
-        
-        // 1. Live Camera Preview
+        // 1. Live Camera Preview Viewport
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
             flashEnabled = uiState.flashMode == FlashMode.ON || uiState.flashMode == FlashMode.TORCH,
             zoomRatio = uiState.zoomRatio,
             isQrScanMode = (uiState.scanMode == ScanMode.QR_CODE),
             onEdgeDetected = { viewModel.onEdgeDetected(it) },
-            onCameraBind = { handler -> 
+            onCameraBind = { handler ->
                 cameraHandler = handler
                 handler.setZoom(uiState.zoomRatio)
             }
         )
 
-        // 2. Mode-Specific Overlays
+        // 2. Mode-Specific Dynamic Overlays
         when (uiState.scanMode) {
             ScanMode.DOCUMENT -> {
                 DocumentQuadOverlay(
                     quad = uiState.detectedQuad,
                     isDetected = true,
+                    isSteady = uiState.detectionState == DetectionState.HOLD_STILL,
                     showLaser = true
                 )
             }
@@ -158,7 +159,7 @@ fun CameraScreen(
             }
         }
 
-        // 3. Rule of Thirds Grid (Optional)
+        // 3. Rule of Thirds Grid (Toggleable)
         if (uiState.isGridVisible) {
             RuleOfThirdsGrid()
         }
@@ -166,11 +167,11 @@ fun CameraScreen(
         // 4. Tap-to-Focus Animation Ring
         TapToFocusRing(point = uiState.tapFocusPoint)
 
-        // 5. Top Controls Bar
+        // 5. Professional Top Controls Bar (Adobe Scan Style)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 42.dp, start = 16.dp, end = 16.dp),
+                .padding(top = 44.dp, start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -186,41 +187,54 @@ fun CameraScreen(
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
 
-            // Central Status & Auto/Batch Pill
+            // Central Adobe Scan Capture Pill: AUTO / MANUAL + BATCH
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color.Black.copy(alpha = 0.65f))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(24.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(24.dp))
                     .padding(horizontal = 14.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Auto/Manual Toggle
-                Text(
-                    text = if (uiState.isAutoCaptureOn) "AUTO" else "MANUAL",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (uiState.isAutoCaptureOn) LufickEmerald else Color.LightGray,
+                // Auto/Manual Toggle with Status Indicator Dot
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.clickable { viewModel.toggleAutoCapture() }
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (uiState.isAutoCaptureOn) LufickEmerald else Color.Gray)
+                    )
+                    Text(
+                        text = if (uiState.isAutoCaptureOn) "AUTO" else "MANUAL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (uiState.isAutoCaptureOn) LufickEmerald else Color.LightGray,
+                        letterSpacing = 0.5.sp
+                    )
+                }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Box(modifier = Modifier.size(width = 1.dp, height = 12.dp).background(Color.Gray.copy(alpha = 0.4f)))
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 // Batch Mode Toggle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.clickable { viewModel.toggleBatchMode() }
                 ) {
                     Text(
                         text = "BATCH",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (uiState.isBatchMode) LufickEmerald else Color.LightGray
+                        color = if (uiState.isBatchMode) LufickEmerald else Color.LightGray,
+                        letterSpacing = 0.5.sp
                     )
                     if (uiState.batchCount > 0) {
-                        Spacer(modifier = Modifier.width(4.dp))
                         Box(
                             modifier = Modifier
                                 .size(18.dp)
@@ -247,7 +261,7 @@ fun CameraScreen(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(if (uiState.isGridVisible) LufickEmerald.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.55f))
+                        .background(if (uiState.isGridVisible) LufickEmerald.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.55f))
                         .border(1.dp, if (uiState.isGridVisible) LufickEmerald else Color.White.copy(alpha = 0.2f), CircleShape)
                 ) {
                     Icon(
@@ -264,8 +278,8 @@ fun CameraScreen(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(if (uiState.flashMode != FlashMode.OFF) LufickEmerald.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.55f))
-                        .border(1.dp, if (uiState.flashMode != FlashMode.OFF) LufickEmerald else Color.White.copy(alpha = 0.2f), CircleShape)
+                        .background(if (uiState.flashMode != FlashMode.OFF) Color(0xFFFBBF24).copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, if (uiState.flashMode != FlashMode.OFF) Color(0xFFFBBF24) else Color.White.copy(alpha = 0.2f), CircleShape)
                 ) {
                     Icon(
                         imageVector = when (uiState.flashMode) {
@@ -275,116 +289,128 @@ fun CameraScreen(
                             FlashMode.TORCH -> Icons.Default.Highlight
                         },
                         contentDescription = "Flash Mode",
-                        tint = if (uiState.flashMode != FlashMode.OFF) Color.Yellow else Color.White,
+                        tint = if (uiState.flashMode != FlashMode.OFF) Color(0xFFFBBF24) else Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
 
+        // 6. Floating Adobe Scan Guidance Banner (Below Top Bar)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 102.dp)
+        ) {
+            val isSteady = uiState.detectionState == DetectionState.HOLD_STILL
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .border(
+                        width = 1.dp,
+                        color = if (isSteady) Color(0xFF10B981) else LufickEmerald.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Status Dot
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (isSteady) Color(0xFF10B981) else LufickEmerald)
+                )
 
+                Text(
+                    text = uiState.detectionState.message,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
 
-        // 6. Modern Bottom Controls Panel
+                // Circular Progress if Auto-Capturing
+                if (uiState.autoCaptureProgress > 0f) {
+                    CircularProgressIndicator(
+                        progress = { uiState.autoCaptureProgress },
+                        modifier = Modifier.size(14.dp),
+                        color = Color(0xFF10B981),
+                        strokeWidth = 2.dp
+                    )
+                }
+            }
+        }
+
+        // 7. Modern Bottom Controls Panel (Adobe Scan Layout)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                    Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.75f),
+                            Color.Black.copy(alpha = 0.70f),
                             Color.Black.copy(alpha = 0.95f),
                             Color.Black
                         )
                     )
                 )
-                .padding(bottom = 24.dp, top = 8.dp),
+                .padding(bottom = 26.dp, top = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Status & Zoom Row (Cleanly placed at top of bottom controls)
+            // Hardware Zoom Selector Pill (1x, 2x, 3x)
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Detection Status Banner
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .border(1.dp, LufickEmerald.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                val presets = listOf(1.0f, 2.0f, 3.0f)
+                val isCustom = presets.none { kotlin.math.abs(it - uiState.zoomRatio) < 0.08f }
+
+                if (isCustom) {
                     Box(
                         modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (uiState.detectionState == com.lufick.docscanner.viewmodel.DetectionState.HOLD_STILL) Color(0xFF10B981) else LufickEmerald)
-                    )
-                    Text(
-                        text = uiState.detectionState.message,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(LufickEmerald)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "${uiState.zoomRatio}x",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
                 }
 
-                // Zoom Selector (1x, 2x, 3x + Custom Pinch)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 4.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val presets = listOf(1.0f, 2.0f, 3.0f)
-                    val isCustom = presets.none { kotlin.math.abs(it - uiState.zoomRatio) < 0.08f }
-
-                    if (isCustom) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(LufickEmerald)
-                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "${uiState.zoomRatio}x",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                        }
-                    }
-
-                    presets.forEach { zoom ->
-                        val isSel = !isCustom && kotlin.math.abs(uiState.zoomRatio - zoom) < 0.08f
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSel) LufickEmerald else Color.Transparent)
-                                .clickable { viewModel.setZoom(zoom) }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "${zoom.toInt()}x",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSel) Color.Black else Color.White
-                            )
-                        }
+                presets.forEach { zoom ->
+                    val isSel = !isCustom && kotlin.math.abs(uiState.zoomRatio - zoom) < 0.08f
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSel) LufickEmerald else Color.Transparent)
+                            .clickable { viewModel.setZoom(zoom) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${zoom.toInt()}x",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSel) Color.Black else Color.White
+                        )
                     }
                 }
             }
 
-            // Batch Thumbnail Reel (if pages captured)
+            // Batch Thumbnail Reel (if pages have been captured)
             if (uiState.capturedImages.isNotEmpty()) {
                 BatchThumbnailReel(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -397,7 +423,7 @@ fun CameraScreen(
                 )
             }
 
-            // Mode Selector Pill Carousel
+            // Mode Selector Pill Carousel (Adobe Scan Style)
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -408,32 +434,32 @@ fun CameraScreen(
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 6.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) LufickEmerald.copy(alpha = 0.22f) else Color.Transparent)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isSelected) LufickEmerald.copy(alpha = 0.24f) else Color.Transparent)
                             .border(
                                 width = 1.dp,
-                                color = if (isSelected) LufickEmerald.copy(alpha = 0.6f) else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp)
+                                color = if (isSelected) LufickEmerald.copy(alpha = 0.7f) else Color.Transparent,
+                                shape = RoundedCornerShape(14.dp)
                             )
                             .clickable { viewModel.setScanMode(mode) }
-                            .padding(horizontal = 12.dp, vertical = 5.dp)
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = mode.title.uppercase(),
                             fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
                             color = if (isSelected) LufickEmerald else Color.Gray,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.6.sp
                         )
                     }
                 }
             }
 
-            // Shutter Button Row with Redesigned Action / Done Button
+            // Shutter Button Row with Gallery Import and Review / Done
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                    .padding(horizontal = 28.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -449,7 +475,7 @@ fun CameraScreen(
                         .size(54.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .background(Color(0xFF1E222D))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
                 ) {
                     Icon(
                         Icons.Default.PhotoLibrary,
@@ -459,7 +485,7 @@ fun CameraScreen(
                     )
                 }
 
-                // Main High-Precision Shutter Button
+                // Main Adobe Scan Ergonomic Shutter Button with Progress Ring
                 ShutterButton(
                     isAutoCapture = uiState.isAutoCaptureOn,
                     autoCaptureProgress = uiState.autoCaptureProgress,
@@ -475,7 +501,7 @@ fun CameraScreen(
                     }
                 )
 
-                // Redesigned Modern Action / DONE Button
+                // Redesigned Review / Done Action Button
                 val hasBatchPages = uiState.batchCount > 0
                 Box(
                     modifier = Modifier
@@ -486,16 +512,16 @@ fun CameraScreen(
                         )
                         .clip(RoundedCornerShape(18.dp))
                         .background(
-                            if (hasBatchPages) androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            if (hasBatchPages) Brush.horizontalGradient(
                                 listOf(LufickEmerald, Color(0xFF10B981))
                             )
-                            else androidx.compose.ui.graphics.Brush.linearGradient(
+                            else Brush.linearGradient(
                                 listOf(Color(0xFF262A35), Color(0xFF1E222D))
                             )
                         )
                         .border(
                             width = 1.5.dp,
-                            color = if (hasBatchPages) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.15f),
+                            color = if (hasBatchPages) Color(0xFF6EE7B7) else Color.White.copy(alpha = 0.18f),
                             shape = RoundedCornerShape(18.dp)
                         )
                         .clickable {
@@ -534,7 +560,7 @@ fun CameraScreen(
                                 letterSpacing = 0.5.sp
                             )
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Done",
                                 tint = Color.Black,
                                 modifier = Modifier.size(16.dp)
@@ -542,7 +568,7 @@ fun CameraScreen(
                         }
                     } else {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = "Next",
                             tint = Color.White.copy(alpha = 0.85f),
                             modifier = Modifier.size(22.dp)

@@ -31,63 +31,48 @@ import com.lufick.docscanner.theme.LufickEmerald
 import kotlin.math.sin
 
 /**
- * 1. Dynamic Live Document Quad Overlay with Animated Target Reticles, Laser Sweep & Breathing Edge Tracking
+ * 1. Adobe Scan Style Document Quad Overlay:
+ * Features smooth corner L-brackets, soft ambient document fill, glowing anchor pins,
+ * and stable state-based styling (solid serene emerald when locked, subtle dashed when seeking).
  */
 @Composable
 fun DocumentQuadOverlay(
     modifier: Modifier = Modifier,
     quad: QuadCorners,
     isDetected: Boolean = true,
+    isSteady: Boolean = false,
     showLaser: Boolean = true
 ) {
     val infiniteTransition = rememberInfiniteTransition()
 
-    // Continuous Laser Sweep Animation
+    // Smooth subtle corner pulse when seeking
+    val cornerPulse by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    // Gentle laser sweep only active when seeking/detecting
     val laserProgress by infiniteTransition.animateFloat(
         initialValue = 0.05f,
         targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
+            animation = tween(2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         )
     )
-
-    // Dynamic Corner Pulse & Seeking Motion
-    val cornerPulse by infiniteTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    // Adobe Scan Style: Spring-damped smooth corner transitions (eliminates all camera jitter)
-    val animSpec = androidx.compose.animation.core.spring<Float>(
-        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-    )
-
-    val tlX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topLeft.x, animationSpec = animSpec)
-    val tlY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topLeft.y, animationSpec = animSpec)
-
-    val trX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topRight.x, animationSpec = animSpec)
-    val trY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.topRight.y, animationSpec = animSpec)
-
-    val brX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomRight.x, animationSpec = animSpec)
-    val brY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomRight.y, animationSpec = animSpec)
-
-    val blX by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomLeft.x, animationSpec = animSpec)
-    val blY by androidx.compose.animation.core.animateFloatAsState(targetValue = quad.bottomLeft.y, animationSpec = animSpec)
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
 
-        val tl = Offset(tlX * w, tlY * h)
-        val tr = Offset(trX * w, trY * h)
-        val br = Offset(brX * w, brY * h)
-        val bl = Offset(blX * w, blY * h)
+        val tl = Offset(quad.topLeft.x * w, quad.topLeft.y * h)
+        val tr = Offset(quad.topRight.x * w, quad.topRight.y * h)
+        val br = Offset(quad.bottomRight.x * w, quad.bottomRight.y * h)
+        val bl = Offset(quad.bottomLeft.x * w, quad.bottomLeft.y * h)
 
         val quadPath = Path().apply {
             moveTo(tl.x, tl.y)
@@ -97,26 +82,30 @@ fun DocumentQuadOverlay(
             close()
         }
 
-        // Semi-transparent document tint
+        // 1. Semi-transparent document tint
+        val tintAlpha = if (isSteady) 0.16f else if (isDetected) 0.09f else 0.04f
         drawPath(
             path = quadPath,
-            color = LufickEmerald.copy(alpha = if (isDetected) 0.14f else 0.05f)
+            color = LufickEmerald.copy(alpha = tintAlpha)
         )
 
-        // Smooth Glowing Boundary Line
+        // 2. Boundary Quad Line
+        val strokeWidth = if (isSteady) 3.dp.toPx() else 2.dp.toPx()
+        val borderColor = if (isSteady) Color(0xFF10B981) else LufickEmerald.copy(alpha = 0.85f)
         drawPath(
             path = quadPath,
-            color = LufickEmerald.copy(alpha = 0.90f),
+            color = borderColor,
             style = Stroke(
-                width = 2.5.dp.toPx(),
-                pathEffect = if (isDetected) null else PathEffect.dashPathEffect(floatArrayOf(20f, 15f))
+                width = strokeWidth,
+                pathEffect = if (isSteady) null else PathEffect.dashPathEffect(floatArrayOf(24f, 16f))
             )
         )
 
-        // 4 Adobe Scan style Corner L-Brackets with fluid pulse
-        val bracketLen = 28.dp.toPx() * cornerPulse
-        val bracketStroke = 4.dp.toPx()
-        val cornerColor = if (isDetected) LufickEmerald else LufickCyan
+        // 3. Adobe Scan Corner L-Brackets
+        val pulseFactor = if (isSteady) 1.0f else cornerPulse
+        val bracketLen = (30.dp.toPx() * pulseFactor).coerceAtLeast(20f)
+        val bracketStroke = if (isSteady) 4.5.dp.toPx() else 3.5.dp.toPx()
+        val cornerColor = if (isSteady) Color.White else LufickEmerald
 
         // Top-Left L
         drawLine(cornerColor, tl, Offset(tl.x + bracketLen, tl.y), strokeWidth = bracketStroke, cap = StrokeCap.Round)
@@ -134,14 +123,14 @@ fun DocumentQuadOverlay(
         drawLine(cornerColor, bl, Offset(bl.x + bracketLen, bl.y), strokeWidth = bracketStroke, cap = StrokeCap.Round)
         drawLine(cornerColor, bl, Offset(bl.x, bl.y - bracketLen), strokeWidth = bracketStroke, cap = StrokeCap.Round)
 
-        // 4 Circular Anchor Pins at Corners
+        // 4. Corner Anchor Dot Pins
         listOf(tl, tr, br, bl).forEach { pt ->
-            drawCircle(color = LufickEmerald, radius = 5.dp.toPx(), center = pt)
-            drawCircle(color = Color.White, radius = 2.5.dp.toPx(), center = pt)
+            drawCircle(color = if (isSteady) Color(0xFF10B981) else LufickEmerald, radius = 6.dp.toPx(), center = pt)
+            drawCircle(color = Color.White, radius = 3.dp.toPx(), center = pt)
         }
 
-        // Sweeping Laser Beam
-        if (showLaser && isDetected) {
+        // 5. Laser Scan Sweep (only when searching or stabilizing)
+        if (showLaser && !isSteady) {
             val currentLaserY = (tl.y + (bl.y - tl.y) * laserProgress).coerceIn(0f, h)
             val laserStartX = tl.x + (bl.x - tl.x) * laserProgress
             val laserEndX = tr.x + (br.x - tr.x) * laserProgress
@@ -158,7 +147,7 @@ fun DocumentQuadOverlay(
                 ),
                 start = Offset(laserStartX, currentLaserY),
                 end = Offset(laserEndX, currentLaserY),
-                strokeWidth = 3.dp.toPx(),
+                strokeWidth = 2.5.dp.toPx(),
                 cap = StrokeCap.Round
             )
         }

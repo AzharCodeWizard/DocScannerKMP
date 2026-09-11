@@ -57,9 +57,12 @@ class CameraViewModel : ViewModel() {
 
     private var autoCaptureJob: Job? = null
     private var focusResetJob: Job? = null
+    private var stableFrameCount = 0
 
     fun setScanMode(mode: ScanMode) {
         _uiState.value = _uiState.value.copy(scanMode = mode)
+        stableFrameCount = 0
+        cancelAutoCapture()
     }
 
     fun cycleFlashMode() {
@@ -77,8 +80,9 @@ class CameraViewModel : ViewModel() {
     }
 
     fun toggleAutoCapture() {
-        _uiState.value = _uiState.value.copy(isAutoCaptureOn = !_uiState.value.isAutoCaptureOn)
-        if (!_uiState.value.isAutoCaptureOn) {
+        val newAuto = !_uiState.value.isAutoCaptureOn
+        _uiState.value = _uiState.value.copy(isAutoCaptureOn = newAuto)
+        if (!newAuto) {
             cancelAutoCapture()
         }
     }
@@ -106,66 +110,64 @@ class CameraViewModel : ViewModel() {
 
     fun onEdgeDetected(quad: QuadCorners) {
         val curr = _uiState.value.detectedQuad
-        
-        // Calculate total movement across 4 corners to eliminate sensor jitter noise
+
         val moveTl = kotlin.math.hypot((quad.topLeft.x - curr.topLeft.x).toDouble(), (quad.topLeft.y - curr.topLeft.y).toDouble()).toFloat()
         val moveTr = kotlin.math.hypot((quad.topRight.x - curr.topRight.x).toDouble(), (quad.topRight.y - curr.topRight.y).toDouble()).toFloat()
         val moveBr = kotlin.math.hypot((quad.bottomRight.x - curr.bottomRight.x).toDouble(), (quad.bottomRight.y - curr.bottomRight.y).toDouble()).toFloat()
         val moveBl = kotlin.math.hypot((quad.bottomLeft.x - curr.bottomLeft.x).toDouble(), (quad.bottomLeft.y - curr.bottomLeft.y).toDouble()).toFloat()
         val maxPointMovement = maxOf(moveTl, moveTr, moveBr, moveBl)
 
-        // Deadband filter: ignore micro-jitter below 0.012 (prevents overlay shaking)
-        if (maxPointMovement < 0.012f) {
-            if (_uiState.value.detectionState != DetectionState.HOLD_STILL) {
-                _uiState.value = _uiState.value.copy(detectionState = DetectionState.HOLD_STILL)
-            }
-            if (_uiState.value.isAutoCaptureOn && _uiState.value.scanMode == ScanMode.DOCUMENT) {
-                if (autoCaptureJob == null || !autoCaptureJob!!.isActive) {
-                    startAutoCaptureTimer()
-                }
-            }
-            return
+        val isMovementMinimal = maxPointMovement < 0.025f
+
+        if (isMovementMinimal) {
+            stableFrameCount++
+        } else {
+            stableFrameCount = 0
+            cancelAutoCapture()
         }
 
-        // Dynamic Lerp Factor: smooth gliding for small moves, responsive tracking for large pans
-        val lerpFactor = if (maxPointMovement > 0.12f) 0.35f else 0.20f
-        val smoothed = QuadCorners(
-            topLeft = PointF(
-                curr.topLeft.x + (quad.topLeft.x - curr.topLeft.x) * lerpFactor,
-                curr.topLeft.y + (quad.topLeft.y - curr.topLeft.y) * lerpFactor
-            ),
-            topRight = PointF(
-                curr.topRight.x + (quad.topRight.x - curr.topRight.x) * lerpFactor,
-                curr.topRight.y + (quad.topRight.y - curr.topRight.y) * lerpFactor
-            ),
-            bottomRight = PointF(
-                curr.bottomRight.x + (quad.bottomRight.x - curr.bottomRight.x) * lerpFactor,
-                curr.bottomRight.y + (quad.bottomRight.y - curr.bottomRight.y) * lerpFactor
-            ),
-            bottomLeft = PointF(
-                curr.bottomLeft.x + (quad.bottomLeft.x - curr.bottomLeft.x) * lerpFactor,
-                curr.bottomLeft.y + (quad.bottomLeft.y - curr.bottomLeft.y) * lerpFactor
+        // Requires 3 consecutive stable frames before triggering HOLD_STILL
+        val isSteady = stableFrameCount >= 3
+        val newState = if (isSteady) DetectionState.HOLD_STILL else DetectionState.DETECTED
+
+        // Only update quad when movement is outside deadband (> 0.015f)
+        val updatedQuad = if (maxPointMovement >= 0.015f) {
+            val lerpFactor = if (maxPointMovement > 0.10f) 0.35f else 0.22f
+            QuadCorners(
+                topLeft = PointF(
+                    curr.topLeft.x + (quad.topLeft.x - curr.topLeft.x) * lerpFactor,
+                    curr.topLeft.y + (quad.topLeft.y - curr.topLeft.y) * lerpFactor
+                ),
+                topRight = PointF(
+                    curr.topRight.x + (quad.topRight.x - curr.topRight.x) * lerpFactor,
+                    curr.topRight.y + (quad.topRight.y - curr.topRight.y) * lerpFactor
+                ),
+                bottomRight = PointF(
+                    curr.bottomRight.x + (quad.bottomRight.x - curr.bottomRight.x) * lerpFactor,
+                    curr.bottomRight.y + (quad.bottomRight.y - curr.bottomRight.y) * lerpFactor
+                ),
+                bottomLeft = PointF(
+                    curr.bottomLeft.x + (quad.bottomLeft.x - curr.bottomLeft.x) * lerpFactor,
+                    curr.bottomLeft.y + (quad.bottomLeft.y - curr.bottomLeft.y) * lerpFactor
+                )
             )
-        )
+        } else {
+            curr
+        }
 
-        val isStable = maxPointMovement < 0.04f
-        val newDetectionState = if (isStable) DetectionState.HOLD_STILL else DetectionState.DETECTED
-
-        _uiState.value = _uiState.value.copy(
-            detectedQuad = smoothed,
-            detectionState = newDetectionState
-        )
+        if (updatedQuad != curr || newState != _uiState.value.detectionState) {
+            _uiState.value = _uiState.value.copy(
+                detectedQuad = updatedQuad,
+                detectionState = newState
+            )
+        }
 
         if (_uiState.value.isAutoCaptureOn && _uiState.value.scanMode == ScanMode.DOCUMENT) {
-            if (isStable) {
+            if (isSteady) {
                 if (autoCaptureJob == null || !autoCaptureJob!!.isActive) {
                     startAutoCaptureTimer()
                 }
-            } else {
-                cancelAutoCapture()
             }
-        } else {
-            cancelAutoCapture()
         }
     }
 
